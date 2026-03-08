@@ -122,7 +122,6 @@ ReportCast follows [Semantic Versioning](https://semver.org/):
 - Git workflow: GitFlow (main, develop, feature/*, release/*)
 - Docker images: Tagged with version + `latest`
 - Auto-migration: Database migrations run on API startup
-- See [.claude/VERSIONING.md](.claude/VERSIONING.md) for details
 
 **Quick release:**
 ```bash

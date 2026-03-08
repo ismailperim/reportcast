@@ -129,8 +129,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Documentation**
   - API.md: Complete REST API documentation
   - QUICKSTART.md: 5-minute setup guide
-  - .claude/VERSIONING.md: Version management strategy
-  - .claude/PRICING.md: Pricing and business model
+  - DEPLOYMENT.md: Production deployment guide
+  - TTS_SERVICES.md: TTS provider comparison
 
 ### Changed
 - Restructured Docker Compose (all services in one file)
@@ -180,7 +180,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - README.md
   - TTS_SERVICES.md (TTS setup guide)
   - QUICK_START.md
-  - .claude/ folder (development notes)
   - .env.example template
 
 ### Technical

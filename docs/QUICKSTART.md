@@ -208,9 +208,9 @@ npm run dev:queue
 ## What's Next?
 
 - Read [API.md](API.md) for full API documentation
+- Read [API_ADDITIONS.md](API_ADDITIONS.md) for pricing & admin endpoints
 - Check [TTS_SERVICES.md](TTS_SERVICES.md) for TTS options
-- Review [.claude/PRICING.md](.claude/PRICING.md) for pricing strategy
-- Explore [.claude/DEVELOPMENT.md](.claude/DEVELOPMENT.md) for architecture
+- Review [DEPLOYMENT.md](DEPLOYMENT.md) for production setup
 
 ---
 
