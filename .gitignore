@@ -3,7 +3,6 @@ dist/
 *.log
 .env
 .env.local
-package-lock.json
 *.d.ts
 *.d.ts.map
 *.js.map
