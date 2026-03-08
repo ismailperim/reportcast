@@ -1,0 +1,181 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: reportcast-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: reportcast
+      POSTGRES_PASSWORD: reportcast_dev_password
+      POSTGRES_DB: reportcast
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U reportcast"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis (BullMQ backend)
+  redis:
+    image: redis:7-alpine
+    container_name: reportcast-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # MinIO (S3-compatible object storage)
+  minio:
+    image: minio/minio:latest
+    container_name: reportcast-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    ports:
+      - "9000:9000"  # S3 API
+      - "9001:9001"  # Web Console
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # TTS Server (OpenedAI Speech - Piper backend)
+  tts-server:
+    image: ghcr.io/matatonic/openedai-speech:latest
+    container_name: reportcast-tts
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - tts_voices:/app/voices
+      - tts_config:/app/config
+    environment:
+      - PRELOAD=xtts
+      - TTS_HOST=0.0.0.0
+      - TTS_PORT=8000
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/v1/models"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # API Server
+  api:
+    image: ghcr.io/ismailperim/reportcast-api:${API_VERSION:-latest}
+    build:
+      context: .
+      dockerfile: packages/api/Dockerfile
+    container_name: reportcast-api
+    restart: unless-stopped
+    working_dir: /app/packages/api
+    command: ["npx", "tsx", "src/index.ts"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: reportcast
+      DB_PASSWORD: reportcast_dev_password
+      DB_NAME: reportcast
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      TTS_SERVER_URL: http://tts-server:8000
+      JWT_SECRET: ${JWT_SECRET:-change_me_in_production}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      S3_PROVIDER: ${S3_PROVIDER:-minio}
+      S3_ENDPOINT: ${S3_ENDPOINT:-http://minio:9000}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-minioadmin}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-minioadmin}
+      S3_BUCKET: ${S3_BUCKET:-reportcast}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_PUBLIC_URL: ${S3_PUBLIC_URL:-http://localhost:9000}
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./uploads:/app/uploads
+      - ./outputs:/app/outputs
+    # healthcheck:
+    #   test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+    #   interval: 30s
+    #   timeout: 10s
+    #   retries: 3
+
+  # BullMQ Worker
+  worker:
+    image: ghcr.io/ismailperim/reportcast-worker:${WORKER_VERSION:-latest}
+    build:
+      context: .
+      dockerfile: packages/worker/Dockerfile
+    container_name: reportcast-worker
+    restart: unless-stopped
+    working_dir: /app/packages/worker
+    command: ["npx", "tsx", "src/queue-worker.ts"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      tts-server:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: reportcast
+      DB_PASSWORD: reportcast_dev_password
+      DB_NAME: reportcast
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      TTS_SERVER_URL: http://tts-server:8000
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      S3_PROVIDER: ${S3_PROVIDER:-minio}
+      S3_ENDPOINT: ${S3_ENDPOINT:-http://minio:9000}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-minioadmin}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-minioadmin}
+      S3_BUCKET: ${S3_BUCKET:-reportcast}
+      S3_REGION: ${S3_REGION:-us-east-1}
+    volumes:
+      - ./uploads:/app/uploads
+      - ./outputs:/app/outputs
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  tts_voices:
+    driver: local
+  tts_config:
+    driver: local
+  minio_data:
+    driver: local
+
+networks:
+  default:
+    name: reportcast-network

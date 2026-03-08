@@ -1,0 +1,33 @@
+node_modules/
+dist/
+*.log
+.env
+.env.local
+package-lock.json
+*.d.ts
+*.d.ts.map
+*.js.map
+
+# Private development notes
+.claude/
+
+# Runtime folders (Docker volumes)
+uploads/
+outputs/
+
+# Outputs
+packages/worker/outputs/*.mp3
+packages/worker/outputs/*.wav
+
+# Inputs (optional - might want to commit test files)
+packages/worker/inputs/*.txt
+packages/worker/inputs/*.pdf
+
+# OS
+.DS_Store
+Thumbs.db
+*.mp3
+test-*.js
+.env
+packages/*/node_modules
+packages/*/dist
