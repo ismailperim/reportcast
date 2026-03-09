@@ -10,7 +10,7 @@ export const users = pgTable('users', {
   provider: text('provider').default('email'), // email, google, github
   stripeCustomerId: text('stripe_customer_id'),
   plan: text('plan').default('free'), // free, team, business, enterprise
-  creditsRemaining: integer('credits_remaining').default(5), // Free tier: 5 credits
+  creditsRemaining: integer('credits_remaining').default(15), // Free tier: 15 credits (45 pages)
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });

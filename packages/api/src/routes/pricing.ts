@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { isFeatureEnabled } from '../config/deployment.js';
+import { getPricingConfig, calculateRequiredCredits } from '../services/pricing-service.js';
 
 const router = Router();
 
@@ -9,128 +10,61 @@ const router = Router();
  * Get pricing information (public endpoint)
  * Returns empty in on-premise mode
  */
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   if (!isFeatureEnabled('pricing')) {
     return res.json({
       mode: 'on-premise',
       message: 'All features are free in on-premise mode',
-      plans: [],
-      tiers: {},
+      packages: [],
+      model: 'unlimited',
     });
   }
 
-  // SaaS mode: Return pricing tiers
-  res.json({
-    mode: 'saas',
-    currency: 'USD',
-    tiers: {
-      short: {
-        name: 'Short Report',
-        pages: '1-5',
-        price: 0.99,
-        priceCents: 99,
-        description: 'Perfect for quick summaries and brief documents',
-      },
-      medium: {
-        name: 'Medium Report',
-        pages: '6-15',
-        price: 2.99,
-        priceCents: 299,
-        description: 'Ideal for standard reports and articles',
-      },
-      long: {
-        name: 'Long Report',
-        pages: '16-50',
-        price: 4.99,
-        priceCents: 499,
-        description: 'Best for comprehensive documents and whitepapers',
-      },
-      enterprise: {
-        name: 'Enterprise',
-        pages: '51+',
-        price: null,
-        priceCents: null,
-        description: 'Custom pricing for large documents',
-        contactEmail: 'sales@reportcast.com',
-      },
-    },
-    plans: [
-      {
-        id: 'free',
-        name: 'Free',
-        price: 0,
-        credits: 5,
-        features: [
-          '5 free reports',
-          'Basic AI models (GPT-4 Turbo)',
-          'Free TTS voices (Piper)',
-          'Community support',
-        ],
-      },
-      {
-        id: 'team',
-        name: 'Team',
-        price: 29,
-        priceAnnual: 290,
-        credits: 50,
-        features: [
-          '50 reports/month',
-          'Premium AI models (Claude, GPT-4o)',
-          'Premium TTS voices (OpenAI, ElevenLabs)',
-          'Priority support',
-          'API access',
-        ],
-      },
-      {
-        id: 'business',
-        name: 'Business',
-        price: 99,
-        priceAnnual: 990,
-        credits: 200,
-        features: [
-          '200 reports/month',
-          'All AI models',
-          'All TTS voices',
-          'Dedicated support',
-          'Custom branding',
-          'SSO integration',
-        ],
-      },
-      {
-        id: 'enterprise',
-        name: 'Enterprise',
-        price: null,
-        credits: null,
-        features: [
-          'Unlimited reports',
-          'On-premise deployment option',
-          'Custom AI models',
-          'White-label solution',
-          'SLA guarantee',
-          'Dedicated account manager',
-        ],
-        contactEmail: 'sales@reportcast.com',
-      },
-    ],
-    creditPricing: {
-      price: 0.99,
-      priceCents: 99,
-      description: 'Additional credits can be purchased at $0.99 per report',
-    },
-  });
+  try {
+    const pricing = await getPricingConfig();
+
+    // SaaS mode: Return credit-based pricing (MVP - Pay-per-use only)
+    res.json({
+      mode: 'saas',
+      model: 'pay-per-use',
+      currency: 'USD',
+      
+      // Credit system
+      creditsPerPage: pricing.creditsPerPage,
+      freeCredits: pricing.freeCredits,
+      
+      // Credit packages
+      packages: pricing.packages.map(pkg => ({
+        id: pkg.id,
+        name: pkg.name,
+        credits: pkg.credits,
+        pages: pkg.pages,
+        price: pkg.priceCents / 100,
+        priceCents: pkg.priceCents,
+        priceFormatted: pkg.priceFormatted,
+        pricePerCredit: (pkg.priceCents / pkg.credits / 100).toFixed(3),
+        description: `${pkg.pages} pages worth of processing`,
+        bestValue: pkg.id === 'pro', // Highlight best value
+      })),
+
+      // Future: Subscription plans will be added here
+      // plans: []  
+    });
+  } catch (error) {
+    console.error('Pricing endpoint error:', error);
+    res.status(500).json({ error: 'Failed to load pricing' });
+  }
 });
 
 /**
  * GET /api/pricing/calculate
  * 
- * Calculate price for a given page count
+ * Calculate required credits and recommended package for a page count
  */
-router.get('/calculate', (req, res) => {
+router.get('/calculate', async (req, res) => {
   if (!isFeatureEnabled('pricing')) {
     return res.json({
-      tier: 'free',
-      price: 0,
-      priceCents: 0,
+      credits: 0,
       message: 'Free in on-premise mode',
     });
   }
@@ -141,30 +75,39 @@ router.get('/calculate', (req, res) => {
     return res.status(400).json({ error: 'Invalid page count' });
   }
 
-  let tier: string;
-  let priceCents: number;
+  try {
+    const pricing = await getPricingConfig();
+    const requiredCredits = calculateRequiredCredits(pageCount, pricing.creditsPerPage);
 
-  if (pageCount <= 5) {
-    tier = 'short';
-    priceCents = 99;
-  } else if (pageCount <= 15) {
-    tier = 'medium';
-    priceCents = 299;
-  } else if (pageCount <= 50) {
-    tier = 'long';
-    priceCents = 499;
-  } else {
-    tier = 'enterprise';
-    priceCents = 0;
+    // Find recommended package (smallest package that covers the credits)
+    const recommendedPackage = pricing.packages.find(pkg => pkg.credits >= requiredCredits) 
+      || pricing.packages[pricing.packages.length - 1]; // Default to largest if exceeds all
+
+    res.json({
+      pageCount,
+      creditsRequired: requiredCredits,
+      creditsPerPage: pricing.creditsPerPage,
+      recommendedPackage: {
+        id: recommendedPackage.id,
+        name: recommendedPackage.name,
+        credits: recommendedPackage.credits,
+        price: recommendedPackage.priceCents / 100,
+        priceCents: recommendedPackage.priceCents,
+        priceFormatted: recommendedPackage.priceFormatted,
+      },
+      allPackages: pricing.packages.map(pkg => ({
+        id: pkg.id,
+        name: pkg.name,
+        credits: pkg.credits,
+        price: pkg.priceCents / 100,
+        priceCents: pkg.priceCents,
+        canProcess: pkg.credits >= requiredCredits,
+      })),
+    });
+  } catch (error) {
+    console.error('Calculate pricing error:', error);
+    res.status(500).json({ error: 'Failed to calculate pricing' });
   }
-
-  res.json({
-    tier,
-    pageCount,
-    price: priceCents / 100,
-    priceCents,
-    currency: 'USD',
-  });
 });
 
 export default router;

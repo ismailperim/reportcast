@@ -139,7 +139,7 @@ router.post(
 /**
  * POST /api/payments/buy-credits
  * 
- * Purchase credits (bulk buy)
+ * Purchase credit package
  */
 router.post('/buy-credits', authenticate, async (req, res) => {
   try {
@@ -149,35 +149,54 @@ router.post('/buy-credits', authenticate, async (req, res) => {
       });
     }
 
-    const { credits } = req.body;
+    const { packageId } = req.body;
     const userId = req.user!.id;
 
-    if (!credits || typeof credits !== 'number' || credits < 1) {
-      return res.status(400).json({ error: 'Invalid credits amount' });
+    if (!packageId) {
+      return res.status(400).json({ error: 'Package ID required' });
     }
 
-    // Credit pricing: $0.99 per credit
-    const pricePerCredit = 99; // cents
-    const amountCents = credits * pricePerCredit;
+    // Get pricing config
+    const { getPricingConfig } = await import('../services/pricing-service.js');
+    const pricing = await getPricingConfig();
+
+    // Find package
+    const pkg = pricing.packages.find(p => p.id === packageId);
+
+    if (!pkg) {
+      return res.status(400).json({ 
+        error: 'Invalid package',
+        availablePackages: pricing.packages.map(p => p.id),
+      });
+    }
 
     // Create payment intent
     const { clientSecret, paymentIntentId } = await createPaymentIntent({
       userId,
-      amountCents,
+      amountCents: pkg.priceCents,
       type: 'credits',
-      creditsAdded: credits,
+      creditsAdded: pkg.credits,
       metadata: {
-        credits: String(credits),
+        packageId: pkg.id,
+        packageName: pkg.name,
+        credits: String(pkg.credits),
+        pages: String(pkg.pages),
       },
     });
 
     res.json({
       clientSecret,
       paymentIntentId,
-      credits,
-      amount: amountCents,
+      package: {
+        id: pkg.id,
+        name: pkg.name,
+        credits: pkg.credits,
+        pages: pkg.pages,
+        price: pkg.priceCents / 100,
+        priceCents: pkg.priceCents,
+        priceFormatted: pkg.priceFormatted,
+      },
       currency: 'usd',
-      pricePerCredit,
     });
 
   } catch (error) {

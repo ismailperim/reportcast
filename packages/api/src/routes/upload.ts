@@ -2,10 +2,12 @@ import { Router } from 'express';
 import multer from 'multer';
 import { PDFParser } from '../../../worker/src/parsers/pdf-parser.js';
 import { db } from '../db/index.js';
-import { reports } from '../db/schema.js';
+import { reports, users } from '../db/schema.js';
 import { reportQueue } from '../queue/index.js';
 import { authenticateUser } from '../middleware/auth.js';
 import { isFeatureEnabled } from '../config/deployment.js';
+import { getPricingConfig, calculateRequiredCredits } from '../services/pricing-service.js';
+import { eq } from 'drizzle-orm';
 import path from 'path';
 import fs from 'fs/promises';
 
@@ -38,25 +40,13 @@ const upload = multer({
   },
 });
 
-// Tier pricing (cents)
-const TIER_PRICING = {
-  short: 99,    // 1-5 pages: $0.99
-  medium: 299,  // 6-15 pages: $2.99
-  long: 499,    // 16-50 pages: $4.99
-  enterprise: null, // 51+ pages: custom pricing
-};
-
-function detectTier(pageCount: number): keyof typeof TIER_PRICING {
-  if (pageCount <= 5) return 'short';
-  if (pageCount <= 15) return 'medium';
-  if (pageCount <= 50) return 'long';
-  return 'enterprise';
-}
+// Max pages for automated processing
+const MAX_PAGES_AUTO = 200;
 
 /**
  * POST /api/upload
  * 
- * Upload PDF and get pricing estimate
+ * Upload PDF and check credit requirements
  */
 router.post('/', authenticateUser, upload.single('file'), async (req, res) => {
   try {
@@ -74,28 +64,25 @@ router.post('/', authenticateUser, upload.single('file'), async (req, res) => {
     const metadata = await pdfParser.getMetadata(filePath);
     const pageCount = metadata.pages;
 
-    // Detect tier and pricing (only in SaaS mode)
+    // Check page limit
+    if (isFeatureEnabled('pricing') && pageCount > MAX_PAGES_AUTO) {
+      return res.status(400).json({
+        error: 'Document too large for automated processing',
+        pageCount,
+        maxPages: MAX_PAGES_AUTO,
+        message: 'Please contact sales for large document processing',
+        contactEmail: 'sales@reportcast.com',
+      });
+    }
+
+    // Calculate required credits (MVP: Pay-per-use model)
+    let requiredCredits = 0;
     let tier = 'unlimited';
-    let priceCents = 0;
 
     if (isFeatureEnabled('pricing')) {
-      // SaaS mode: Apply pricing tiers
-      tier = detectTier(pageCount);
-      priceCents = TIER_PRICING[tier] || 0;
-
-      // Check if enterprise tier (requires manual pricing)
-      if (tier === 'enterprise') {
-        return res.status(400).json({
-          error: 'Document too large for automated processing',
-          pageCount,
-          message: 'Please contact sales for enterprise pricing',
-          contactEmail: 'sales@reportcast.com',
-        });
-      }
-    } else {
-      // On-premise mode: No pricing, unlimited pages
-      tier = 'unlimited';
-      priceCents = 0;
+      const pricing = await getPricingConfig();
+      requiredCredits = calculateRequiredCredits(pageCount, pricing.creditsPerPage);
+      tier = 'pay-per-use';
     }
 
     // Create report record
@@ -105,7 +92,7 @@ router.post('/', authenticateUser, upload.single('file'), async (req, res) => {
       fileSize,
       pageCount,
       tier,
-      priceCents: priceCents!,
+      priceCents: 0, // MVP: Credits only, no direct pricing
       status: 'pending',
     }).returning();
 
@@ -113,15 +100,40 @@ router.post('/', authenticateUser, upload.single('file'), async (req, res) => {
       reportId: report.id,
       filename,
       pageCount,
-      tier,
       status: 'pending',
     };
 
     if (isFeatureEnabled('pricing')) {
-      response.priceCents = priceCents;
-      response.priceFormatted = `$${(priceCents / 100).toFixed(2)}`;
-      response.currency = 'USD';
-      response.message = 'Ready for processing. Confirm payment to start.';
+      const userCredits = req.user!.creditsRemaining;
+      const hasEnoughCredits = userCredits >= requiredCredits;
+
+      response.creditsRequired = requiredCredits;
+      response.creditsAvailable = userCredits;
+      response.hasEnoughCredits = hasEnoughCredits;
+      
+      if (hasEnoughCredits) {
+        response.message = `Ready to process. Will consume ${requiredCredits} credits.`;
+      } else {
+        response.message = `Insufficient credits. You need ${requiredCredits} credits but have ${userCredits}.`;
+        response.creditDeficit = requiredCredits - userCredits;
+        
+        // Recommend package
+        const pricing = await getPricingConfig();
+        const recommendedPackage = pricing.packages.find(pkg => 
+          pkg.credits >= (requiredCredits - userCredits)
+        );
+        
+        if (recommendedPackage) {
+          response.recommendedPackage = {
+            id: recommendedPackage.id,
+            name: recommendedPackage.name,
+            credits: recommendedPackage.credits,
+            price: recommendedPackage.priceCents / 100,
+            priceCents: recommendedPackage.priceCents,
+            priceFormatted: recommendedPackage.priceFormatted,
+          };
+        }
+      }
     } else {
       response.message = 'Ready for processing. Confirm to start (free).';
     }
@@ -140,23 +152,16 @@ router.post('/', authenticateUser, upload.single('file'), async (req, res) => {
 /**
  * POST /api/upload/:reportId/confirm
  * 
- * Confirm payment and start processing
+ * Confirm and start processing (deducts credits)
  */
 router.post('/:reportId/confirm', authenticateUser, async (req, res) => {
   try {
     const { reportId } = req.params;
-    const { 
-      language = 'auto', 
-      tone = 'professional',
-      aiProvider = 'openai',
-      aiModel = 'gpt-4-turbo',
-      ttsProvider = 'openedai',
-      ttsVoice = 'auto', // auto-select based on language
-    } = req.body;
+    const { language = 'auto', tone = 'professional', aiProvider = 'openai', aiModel = 'gpt-4-turbo', ttsProvider = 'openedai', ttsVoice = 'auto' } = req.body;
     const userId = req.user!.id;
 
     // Get report
-    const [report] = await db.select().from(reports).where({ id: reportId }).limit(1);
+    const [report] = await db.select().from(reports).where(eq(reports.id, reportId)).limit(1);
 
     if (!report) {
       return res.status(404).json({ error: 'Report not found' });
@@ -170,10 +175,43 @@ router.post('/:reportId/confirm', authenticateUser, async (req, res) => {
       return res.status(400).json({ error: 'Report already processed or processing' });
     }
 
+    // Credit check (SaaS mode only)
+    if (isFeatureEnabled('pricing')) {
+      const pricing = await getPricingConfig();
+      const requiredCredits = calculateRequiredCredits(report.pageCount, pricing.creditsPerPage);
+
+      // Get fresh user credits
+      const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+      
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      if (user.creditsRemaining < requiredCredits) {
+        return res.status(402).json({
+          error: 'Insufficient credits',
+          creditsRequired: requiredCredits,
+          creditsAvailable: user.creditsRemaining,
+          message: 'Please purchase credits to continue',
+        });
+      }
+
+      // Deduct credits
+      await db
+        .update(users)
+        .set({ 
+          creditsRemaining: user.creditsRemaining - requiredCredits,
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, userId));
+
+      console.log(`✅ Deducted ${requiredCredits} credits from user ${userId} (had ${user.creditsRemaining}, now ${user.creditsRemaining - requiredCredits})`);
+    }
+
     // Premium model/voice check (SaaS only)
     if (isFeatureEnabled('premiumModels')) {
-      const { aiModels, ttsVoices: ttsVoicesTable } = await import('../db/schema.js');
-      const { eq, and } = await import('drizzle-orm');
+      const { aiModels, ttsVoices } = await import('../db/schema.js');
+      const { and } = await import('drizzle-orm');
 
       // Check AI model
       const [selectedModel] = await db
@@ -189,27 +227,22 @@ router.post('/:reportId/confirm', authenticateUser, async (req, res) => {
         return res.status(400).json({ error: 'Selected AI model not available' });
       }
 
-      if (selectedModel.isPremium) {
-        // TODO: Check user's plan (free/paid)
-        // For now, reject premium models in SaaS free tier
-        const userPlan = req.user!.plan;
-        if (userPlan === 'free') {
-          return res.status(403).json({
-            error: 'Premium model requires paid plan',
-            model: selectedModel.displayName,
-            upgrade: 'Upgrade to Team or Business plan',
-          });
-        }
+      if (selectedModel.isPremium && req.user!.plan === 'free') {
+        return res.status(403).json({
+          error: 'Premium model requires paid plan',
+          model: selectedModel.displayName,
+          upgrade: 'Upgrade to Team or Business plan',
+        });
       }
 
       // Check TTS voice (if not auto)
       if (ttsVoice !== 'auto') {
         const [selectedVoice] = await db
           .select()
-          .from(ttsVoicesTable)
+          .from(ttsVoices)
           .where(and(
-            eq(ttsVoicesTable.voiceId, ttsVoice),
-            eq(ttsVoicesTable.isActive, true)
+            eq(ttsVoices.voiceId, ttsVoice),
+            eq(ttsVoices.isActive, true)
           ))
           .limit(1);
 
@@ -227,13 +260,6 @@ router.post('/:reportId/confirm', authenticateUser, async (req, res) => {
       }
     }
 
-    // Process payment (SaaS only)
-    if (isFeatureEnabled('payments') && report.priceCents > 0) {
-      // TODO: Process Stripe payment
-      // For now, skip in development
-      console.log(`💳 Payment required: $${report.priceCents / 100}`);
-    }
-
     // Update status and store provider/model choices
     await db.update(reports).set({ 
       status: 'processing',
@@ -241,7 +267,7 @@ router.post('/:reportId/confirm', authenticateUser, async (req, res) => {
       ttsProvider,
       voice: ttsVoice,
       tone,
-    }).where({ id: reportId });
+    }).where(eq(reports.id, reportId));
 
     // Add to queue
     await reportQueue.add('process-report', {

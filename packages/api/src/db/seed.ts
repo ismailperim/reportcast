@@ -320,10 +320,10 @@ Craft a narrative that keeps listeners engaged throughout. Aim for 4-6 minutes o
       isPublic: true,
     },
     {
-      key: 'free_tier_credits',
-      value: '5',
-      description: 'Number of free credits for new users (SaaS only)',
-      isPublic: false,
+      key: 'pricing_free_credits',
+      value: '15',
+      description: 'Free credits for new users (45 pages)',
+      isPublic: true,
     },
     {
       key: 'stripe_enabled',

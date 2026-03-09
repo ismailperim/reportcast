@@ -16,6 +16,7 @@ Nobody reads your reports. But they'll listen.
 - 🔗 **Public Sharing** - Anonymous share links with listen stats
 - 📊 **Listen Analytics** - Track plays, geography, referrers
 - 🏢 **Deployment Modes** - On-Premise (free, unlimited) or SaaS (paid, managed)
+- 💳 **Flexible Pricing** - Pay-per-use credit system (1 credit = 3 pages)
 - ⚙️ **Admin Panel** - Manage AI models, TTS voices, settings
 
 ## Architecture
@@ -163,6 +164,7 @@ git push origin main --tags
 
 - [Quick Start Guide](docs/QUICKSTART.md) - Get started in 5 minutes
 - [API Documentation](docs/API.md) - REST API reference
+- [Pricing Guide](docs/PRICING.md) - Credit system & packages
 - [TTS Services Guide](docs/TTS_SERVICES.md) - TTS provider setup
 - [Deployment Guide](docs/DEPLOYMENT.md) - Production deployment
 - [Test Plan](docs/TEST_PLAN.md) - Testing & validation

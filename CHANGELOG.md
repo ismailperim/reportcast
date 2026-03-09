@@ -9,10 +9,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### In Progress
 - React frontend (Phase 3)
-- Stripe payment integration (backend ready)
 - Real-time progress updates
 - User dashboard
 - Email notifications
+- Subscription plans (infrastructure ready)
+
+---
+
+## [0.3.1] - 2026-03-09
+
+### Added
+- **Pay-Per-Use Credit System (MVP)**
+  - Credit-based pricing (1 credit = 3 pages)
+  - 15 free credits for new users (45 pages)
+  - Four credit packages (Starter/Basic/Pro/Business)
+  - Database-driven pricing configuration
+  - Credit deduction on report processing
+- **Pricing Service**
+  - Dynamic pricing from database settings
+  - Credit calculation helper
+  - Package recommendation logic
+- **Updated API Endpoints**
+  - `GET /api/pricing` → Returns credit packages
+  - `GET /api/pricing/calculate?pages=N` → Credit requirements
+  - `POST /api/payments/buy-credits` → Package-based purchase
+  - `POST /api/upload` → Credit check + recommendations
+  - `POST /api/upload/:id/confirm` → Credit deduction
+- **Documentation**
+  - PRICING.md: Complete pricing guide
+  - Updated API_ADDITIONS.md
+  - Credit system examples
+
+### Changed
+- Upload flow now checks credits instead of tiers
+- Free tier credits: 5 → 15 (45 pages)
+- Pricing model: Tier-based → Credit-based
+- Payment flow: Direct payment → Credit purchase
+
+### Infrastructure
+- Subscription plan support prepared (not active yet)
+- Premium model/voice gating ready for future plans
 
 ---
 

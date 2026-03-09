@@ -122,5 +122,18 @@ INSERT INTO "settings" ("key", "value", "description", "is_public") VALUES
 ('site_tagline', 'Transform any report into an engaging podcast', 'Application tagline', true),
 ('max_file_size_mb', '10', 'Maximum PDF upload size in MB', true),
 ('max_page_count', '50', 'Maximum pages allowed per report (on-premise: unlimited)', true),
-('free_tier_credits', '5', 'Number of free credits for new users (SaaS only)', false),
-('stripe_enabled', 'false', 'Enable Stripe payments (SaaS only)', false);
+('stripe_enabled', 'false', 'Enable Stripe payments (SaaS only)', false),
+
+-- Pricing Configuration
+('pricing_credits_per_page', '3', 'How many pages equals 1 credit', true),
+('pricing_free_credits', '15', 'Free credits for new users (45 pages)', true),
+
+-- Credit Packages (Pay-Per-Use)
+('pricing_package_starter_credits', '30', 'Starter package credits (90 pages)', true),
+('pricing_package_starter_price', '499', 'Starter package price in cents ($4.99)', true),
+('pricing_package_basic_credits', '100', 'Basic package credits (300 pages)', true),
+('pricing_package_basic_price', '1499', 'Basic package price in cents ($14.99)', true),
+('pricing_package_pro_credits', '300', 'Pro package credits (900 pages)', true),
+('pricing_package_pro_price', '3999', 'Pro package price in cents ($39.99)', true),
+('pricing_package_business_credits', '1000', 'Business package credits (3000 pages)', true),
+('pricing_package_business_price', '9999', 'Business package price in cents ($99.99)', true);

@@ -6,7 +6,32 @@
 
 Get pricing information (public endpoint).
 
-**Response (SaaS mode):**
+**Response (SaaS mode - Pay-Per-Use Model):**
+```json
+{
+  "mode": "saas",
+  "model": "pay-per-use",
+  "currency": "USD",
+  "creditsPerPage": 3,
+  "freeCredits": 15,
+  "packages": [
+    {
+      "id": "starter",
+      "name": "Starter",
+      "credits": 30,
+      "pages": 90,
+      "price": 4.99,
+      "priceCents": 499,
+      "priceFormatted": "$4.99",
+      "pricePerCredit": "0.166",
+      "description": "90 pages worth of processing",
+      "bestValue": false
+    }
+  ]
+}
+```
+
+**Old Response Format (Deprecated):**
 ```json
 {
   "mode": "saas",
