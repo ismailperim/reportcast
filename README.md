@@ -78,7 +78,7 @@ cp .env.example .env
 npm run dev process ./inputs/sample.pdf
 
 # With Turkish voice
-npm run dev process ./inputs/rapor.pdf --tts-provider openedai --voice turkish
+npm run dev process ./inputs/rapor.pdf --tts-provider piper --voice tr_TR-dfki-medium
 ```
 
 ### Option 3: Development Mode
@@ -109,11 +109,11 @@ See [TTS_SERVICES.md](TTS_SERVICES.md) for detailed TTS setup.
 ### TTS Providers
 | Provider | Type | Cost | Languages | Voices |
 |----------|------|------|-----------|--------|
-| **OpenedAI** ⭐ | Self-hosted | FREE | 🇹🇷 🇬🇧 + 40 more | 900+ |
-| OpenAI TTS | Cloud API | $0.045/podcast | 50+ | 6 |
-| ElevenLabs | Cloud API | $0.30/podcast | 25+ | Custom |
+| **Piper-GPL** ⭐ | Self-hosted | FREE | 🇹🇷 🇬🇧 🇩🇪 🇫🇷 🇪🇸 🇷🇺 + 100+ | 900+ |
+| OpenAI TTS | Cloud API | $0.015/1K chars | 50+ | 6 |
+| ElevenLabs | Cloud API | $0.30/1K chars | 30+ | Custom |
 
-**Turkish Support:** Native Turkish TTS available with OpenedAI (Piper `tr_TR-dfki-medium` model)
+**Turkish Support:** Native Turkish TTS with Piper-GPL (`tr_TR-dfki-medium`, `tr_TR-fettah-medium`)
 
 See [TTS_SERVICES.md](TTS_SERVICES.md) for comparison and setup.
 
@@ -139,9 +139,9 @@ git push origin main --tags
 ### Phase 1: Worker POC ✅
 - [x] PDF parser
 - [x] Multi-provider AI (OpenAI, Anthropic)
-- [x] Multi-provider TTS (OpenAI, ElevenLabs, OpenedAI)
+- [x] Multi-provider TTS (OpenAI, ElevenLabs, Piper-GPL)
 - [x] Docker services (self-hosted TTS)
-- [x] Turkish language support
+- [x] Turkish language support (19 pre-loaded voices)
 - [x] Full pipeline test
 
 ### Phase 2: Queue & API ✅

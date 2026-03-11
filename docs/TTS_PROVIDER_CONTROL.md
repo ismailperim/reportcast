@@ -6,7 +6,7 @@ ReportCast allows you to selectively enable/disable TTS providers even when API 
 
 - Use OpenAI API key **only for AI** (transcript generation), not for TTS
 - Prevent expensive cloud TTS usage in development
-- Use only self-hosted TTS (OpenedAI/Piper) for cost control
+- Use only self-hosted TTS (Piper-GPL) for cost control
 
 ## Environment Variables
 
@@ -23,7 +23,7 @@ ENABLE_ELEVENLABS_TTS=false
 
 | Provider | Requirement | Always Available? |
 |----------|-------------|-------------------|
-| **OpenedAI** (Piper) | Docker service running | ✅ Yes (self-hosted) |
+| **Piper-GPL** (Piper) | Docker service running | ✅ Yes (self-hosted) |
 | **OpenAI TTS** | `OPENAI_API_KEY` + `ENABLE_OPENAI_TTS=true` | ❌ No |
 | **ElevenLabs** | `ELEVENLABS_API_KEY` + `ENABLE_ELEVENLABS_TTS=true` | ❌ No |
 
@@ -48,7 +48,7 @@ ENABLE_OPENAI_TTS=true
 ENABLE_ELEVENLABS_TTS=true
 ```
 
-**Result:** OpenedAI + OpenAI + ElevenLabs voices available
+**Result:** Piper-GPL + OpenAI + ElevenLabs voices available
 
 ### 3. On-Premise Only (No Cloud)
 ```bash
@@ -58,7 +58,7 @@ ENABLE_OPENAI_TTS=false        # Disable cloud TTS
 ENABLE_ELEVENLABS_TTS=false
 ```
 
-**Result:** Only OpenedAI (Piper) available, AI still uses OpenAI
+**Result:** Only Piper-GPL (Piper) available, AI still uses OpenAI
 
 ## API Behavior
 
@@ -71,7 +71,7 @@ ENABLE_ELEVENLABS_TTS=false
     {
       "voiceId": "tr_TR-dfki-medium",
       "displayName": "Turkish (Piper)",
-      "provider": "openedai",
+      "provider": "piper",
       "language": "tr"
     }
   ]
@@ -88,7 +88,7 @@ ENABLE_ELEVENLABS_TTS=false
     {"voiceId": "nova", "provider": "openai", "language": "en"},
     {"voiceId": "onyx", "provider": "openai", "language": "en"},
     {"voiceId": "shimmer", "provider": "openai", "language": "en"},
-    {"voiceId": "tr_TR-dfki-medium", "provider": "openedai", "language": "tr"}
+    {"voiceId": "tr_TR-dfki-medium", "provider": "piper", "language": "tr"}
   ]
 }
 ```
@@ -101,8 +101,8 @@ ENABLE_ELEVENLABS_TTS=false
 // Filter by available API keys/services AND enablement flags
 const availableProviders = new Set<string>();
 
-// OpenedAI (self-hosted) is always available
-availableProviders.add('openedai');
+// Piper-GPL (self-hosted) is always available
+availableProviders.add('piper');
 
 // OpenAI TTS - requires both API key AND enablement flag
 if (process.env.OPENAI_API_KEY && process.env.ENABLE_OPENAI_TTS === 'true') {
@@ -121,10 +121,10 @@ voices = voices.filter(v => availableProviders.has(v.provider));
 
 | Scenario | AI Provider | TTS Provider | Cost per 10-page Report |
 |----------|-------------|--------------|-------------------------|
-| **Development** | OpenAI GPT-4o | OpenedAI (Piper) | ~$0.05 (AI only) |
+| **Development** | OpenAI GPT-4o | Piper-GPL (Piper) | ~$0.05 (AI only) |
 | **Production (OpenAI)** | OpenAI GPT-4o | OpenAI TTS | ~$0.10 (AI + TTS) |
 | **Production (Premium)** | OpenAI GPT-4o | ElevenLabs | ~$0.35 (AI + premium TTS) |
-| **On-Premise** | OpenAI GPT-4o | OpenedAI (Piper) | ~$0.05 (AI only, TTS free) |
+| **On-Premise** | OpenAI GPT-4o | Piper-GPL (Piper) | ~$0.05 (AI only, TTS free) |
 
 ## Testing
 
@@ -133,7 +133,7 @@ voices = voices.filter(v => availableProviders.has(v.provider));
 curl http://localhost:3000/api/config/tts-voices | jq '.voices[] | .provider' | sort -u
 
 # Expected output (with default settings):
-# "openedai"
+# "piper"
 
 # Enable OpenAI TTS
 echo "ENABLE_OPENAI_TTS=true" >> .env
@@ -144,13 +144,13 @@ curl http://localhost:3000/api/config/tts-voices | jq '.voices[] | .provider' | 
 
 # Expected output:
 # "openai"
-# "openedai"
+# "piper"
 ```
 
 ## Summary
 
 ✅ **AI models** are controlled by API key presence only  
 ✅ **TTS providers** require both API key AND enablement flag  
-✅ **OpenedAI** is always available (self-hosted, no cost)  
-✅ **Default**: Only OpenedAI enabled (cost-safe)  
+✅ **Piper-GPL** is always available (self-hosted, no cost)  
+✅ **Default**: Only Piper-GPL enabled (cost-safe)  
 ✅ **Flexible**: Enable cloud TTS when needed for premium quality

@@ -82,70 +82,29 @@ CMD ["python3", "-m", "piper.http_server", "--host", "0.0.0.0"]
 
 ---
 
-### 2. OpenedAI Speech (Legacy)
+### 2. OpenedAI Speech (Deprecated)
 
-**What:** OpenAI-compatible API with Piper backend  
-**GitHub:** https://github.com/matatonic/openedai-speech  
-**Cost:** FREE (self-hosted)  
-**Setup:** Docker Compose
+**Status:** ⚠️ Replaced by Piper-GPL in v0.4.0
 
-**Features:**
-- ✅ OpenAI API compatible (drop-in replacement)
-- ✅ Piper backend (900+ voices, 40+ languages)
-- ✅ Optional XTTS-v2 (voice cloning, requires GPU)
-- ✅ Minimal Docker image (<1GB with Piper only)
-- ✅ No API key needed
-- ✅ **Turkish support** (`tr_TR-dfki-medium`)
+**Why deprecated:**
+- OpenedAI-Speech wrapper no longer needed
+- Pure Piper-GPL is simpler and lighter
+- Same Piper backend, less complexity
 
-**Start service:**
+**Migration:** Use `piper` provider instead of `openedai`
 ```bash
-docker-compose up tts-server
+# Old
+--tts-provider openedai --voice turkish
+
+# New
+--tts-provider piper --voice tr_TR-dfki-medium
 ```
 
-**Use in Worker:**
-```bash
-# Turkish voice (recommended for Turkish reports)
-npm run dev process inputs/report.pdf --tts-provider openedai --voice turkish
-
-# English voices
-npm run dev process inputs/report.pdf --tts-provider openedai --voice alloy
-```
-
-**Available Voices:**
-- **Turkish:** `turkish`, `tr_TR-dfki-medium` (native Turkish model)
-- **English:** `alloy`, `echo`, `fable`, `onyx`, `nova`, `shimmer`
-- **More Piper voices:** `en_US-lessac-medium`, `en_US-amy-medium`, etc.
-- Full list: http://localhost:8000/v1/models
-
-**Adding More Languages:**
-
-To add more Piper voices (e.g., Spanish, French, German):
-
-1. Download voice model from [Hugging Face](https://huggingface.co/rhasspy/piper-voices):
-   ```bash
-   docker exec reportcast-tts curl -LO \
-     https://huggingface.co/rhasspy/piper-voices/resolve/main/<lang>/<locale>/<model>.onnx
-   
-   docker exec reportcast-tts curl -LO \
-     https://huggingface.co/rhasspy/piper-voices/resolve/main/<lang>/<locale>/<model>.onnx.json
-   ```
-
-2. Add to `/app/config/voice_to_speaker.yaml` inside the container:
-   ```yaml
-   tts-1:
-     your-voice-name:
-       model: voices/<model>.onnx
-       speaker: # default speaker
-   ```
-
-3. Restart container:
-   ```bash
-   docker compose restart tts-server
-   ```
+**Note:** OpenedAI-Speech is still a great project if you need OpenAI API compatibility or XTTS-v2 voice cloning (GPU required).
 
 ---
 
-### 2. OpenAI TTS (Cloud, Paid)
+### 3. OpenAI TTS (Cloud, Paid)
 
 **What:** Official OpenAI TTS API  
 **Cost:** $15/1M characters (~$0.045 per 3-min podcast)  
@@ -185,41 +144,42 @@ npm run dev process inputs/report.pdf --tts-provider elevenlabs --voice Rachel
 
 ## Comparison
 
-| Provider | Cost (3-min) | Quality | Speed | Setup | Voice Cloning |
-|----------|--------------|---------|-------|-------|---------------|
-| **OpenedAI** ⭐ | **$0.00** | Good | Fast | Docker | ❌ (yes with GPU) |
-| OpenAI TTS | $0.045 | Good | Fast | API Key | ❌ |
+| Provider | Cost (1K chars) | Quality | Speed | Setup | Voice Cloning |
+|----------|-----------------|---------|-------|-------|---------------|
+| **Piper-GPL** ⭐ | **$0.00** | Good | Fast | Docker | ❌ |
+| OpenAI TTS | $0.015 | Good | Fast | API Key | ❌ |
 | ElevenLabs | $0.30 | Premium | Fast | API Key | ✅ |
 
 ---
 
 ## Docker Compose Setup
 
-### Minimal (Piper only)
+### Minimal (Piper-GPL)
 
 ```yaml
 services:
   tts-server:
-    image: ghcr.io/matatonic/openedai-speech:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.piper-http
+    image: reportcast-piper-tts:latest
     ports:
-      - "8000:8000"
-    volumes:
-      - tts_voices:/app/voices
-    command: >
-      --xtts_device none
-      -P 8000
-      -H 0.0.0.0
+      - "5000:5000"
 ```
 
-**Size:** ~1GB  
+**Size:** ~500MB (with 7 language packs)  
 **GPU:** Not needed  
+**RAM:** ~200MB  
 **Voices:** Piper (900+)
 
-### Full (Piper + XTTS with voice cloning)
+### Advanced (OpenedAI + XTTS voice cloning)
 
+⚠️ **Note:** This requires OpenedAI-Speech (deprecated in ReportCast v0.4.0)
+
+If you need voice cloning, use OpenedAI-Speech directly:
 ```yaml
 services:
-  tts-server:
+  tts-openedai:
     image: ghcr.io/matatonic/openedai-speech:latest
     ports:
       - "8000:8000"
@@ -236,9 +196,9 @@ services:
       - PRELOAD=xtts
 ```
 
-**Size:** ~8GB  
-**GPU:** Required (CUDA)  
-**Voices:** Piper + XTTS (voice cloning)
+**Size:** ~8GB | **GPU:** Required (CUDA) | **Feature:** Voice cloning
+
+For ReportCast integration, use Piper-GPL (no voice cloning, but free & CPU-only)
 
 ---
 
@@ -274,19 +234,20 @@ case 'my-tts':
 
 ### Option 1: Docker Compose (Recommended)
 ```bash
-# Start all services
-docker-compose up -d
+# Start all services (Piper TTS included)
+docker compose up -d
 
-# Worker connects to tts-server:8000 internally
+# Worker connects to tts-server:5000 internally
 ```
 
 ### Option 2: Separate Hosts
 ```bash
-# TTS server on dedicated host
-docker run -p 8000:8000 ghcr.io/matatonic/openedai-speech:latest
+# Build and run Piper TTS on dedicated host
+docker build -f Dockerfile.piper-http -t piper-tts .
+docker run -p 5000:5000 piper-tts
 
 # Worker environment
-export TTS_SERVER_URL=http://tts-host:8000
+export TTS_SERVER_URL=http://tts-host:5000
 ```
 
 ### Option 3: Cloud APIs Only
@@ -300,15 +261,15 @@ export ELEVENLABS_API_KEY=...
 
 ## Cost Analysis
 
-**1000 podcasts/month @ 3 minutes each:**
+**1000 reports/month @ 3K chars each:**
 
 | Provider | Monthly Cost | Infrastructure | Notes |
 |----------|--------------|----------------|-------|
-| OpenedAI | $0 | $20-50/mo VPS | Free tier default |
+| **Piper-GPL** | **$0** | $0-20/mo VPS (optional) | Free, can run on laptop |
 | OpenAI TTS | $45 | $0 | Mid-tier option |
-| ElevenLabs | $300 | $0 | Premium tier |
+| ElevenLabs | $900 | $0 | Premium tier |
 
-**Break-even:** OpenedAI self-hosted pays for itself after ~100 podcasts vs ElevenLabs.
+**Break-even:** Piper-GPL self-hosted is always free. Even tiny VPS works (200MB RAM).
 
 ---
 
