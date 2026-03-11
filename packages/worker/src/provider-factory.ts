@@ -3,6 +3,7 @@ import { AnthropicProvider } from './providers/ai/anthropic.js';
 import { OpenAITTSProvider } from './providers/tts/openai-tts.js';
 import { ElevenLabsProvider } from './providers/tts/elevenlabs.js';
 import { OpenedAITTSProvider } from './providers/tts/openedai-tts.js';
+import { PiperTTSProvider } from './providers/tts/piper-tts.js';
 import type { AIProvider, AIProviderType } from './types/ai-provider.js';
 import type { TTSProvider, TTSProviderType } from './types/tts-provider.js';
 
@@ -37,6 +38,10 @@ export class ProviderFactory {
         // OpenedAI (Piper backend) doesn't need API key
         // Uses local HTTP server (Docker service)
         return new OpenedAITTSProvider();
+      case 'piper':
+        // Piper-GPL (Pure Piper) doesn't need API key
+        // Uses local HTTP server (Docker service)
+        return new PiperTTSProvider();
       default:
         throw new Error(`Unknown TTS provider: ${type}`);
     }

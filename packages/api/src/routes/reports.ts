@@ -124,10 +124,6 @@ router.get('/:reportId/download', authenticateUser, async (req, res) => {
       });
     }
 
-    if (!report.s3Key) {
-      return res.status(404).json({ error: 'Audio file not found' });
-    }
-
     // Get file from S3 or local disk
     if (report.s3Key && process.env.S3_PROVIDER) {
       const storage = getStorage();

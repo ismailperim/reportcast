@@ -31,4 +31,4 @@ export interface TTSProvider {
   listVoices?(): Promise<string[]>;
 }
 
-export type TTSProviderType = 'openai' | 'elevenlabs' | 'openedai';
+export type TTSProviderType = 'openai' | 'elevenlabs' | 'openedai' | 'piper';

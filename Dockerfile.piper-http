@@ -1,0 +1,44 @@
+FROM python:3.11-slim
+
+# Install dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    espeak-ng \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install compatible NumPy first (2.0.x doesn't need X86_V2)
+RUN pip install --no-cache-dir 'numpy<2.0'
+
+# Install Piper with HTTP support
+RUN pip install --no-cache-dir piper-tts[http]
+
+# Download voices for supported languages
+# Turkish
+RUN python3 -m piper.download_voices tr_TR-dfki-medium
+
+# English (US)
+RUN python3 -m piper.download_voices en_US-lessac-medium
+
+# English (GB)
+RUN python3 -m piper.download_voices en_GB-alan-medium
+
+# German
+RUN python3 -m piper.download_voices de_DE-thorsten-medium
+
+# French
+RUN python3 -m piper.download_voices fr_FR-upmc-medium
+
+# Spanish (Spain)
+RUN python3 -m piper.download_voices es_ES-sharvard-medium
+
+# Russian
+RUN python3 -m piper.download_voices ru_RU-ruslan-medium
+
+# Expose HTTP port
+EXPOSE 5000
+
+# Run HTTP server with default voice (English)
+CMD ["python3", "-m", "piper.http_server", \
+     "-m", "en_US-lessac-medium", \
+     "--host", "0.0.0.0", \
+     "--port", "5000"]

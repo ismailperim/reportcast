@@ -20,7 +20,10 @@ router.post('/register', async (req, res) => {
     const { email, password, name } = req.body;
 
     if (!email || !password) {
-      return res.status(400).json({ error: 'Email and password required' });
+      return res.status(400).json({ 
+        error: 'validation_error',
+        message: 'Email and password required' 
+      });
     }
 
     // Check if user exists
@@ -31,7 +34,10 @@ router.post('/register', async (req, res) => {
       .limit(1);
 
     if (existingUser) {
-      return res.status(409).json({ error: 'User already exists' });
+      return res.status(409).json({ 
+        error: 'user_exists',
+        message: 'User already exists' 
+      });
     }
 
     // Hash password
@@ -46,7 +52,7 @@ router.post('/register', async (req, res) => {
         passwordHash,
         provider: 'email',
         plan: 'free',
-        creditsRemaining: 5, // Free tier: 5 credits
+        creditsRemaining: 15, // Free tier: 15 credits (Phase 3 pricing)
       })
       .returning();
 
@@ -74,7 +80,10 @@ router.post('/register', async (req, res) => {
 
   } catch (error) {
     console.error('Register error:', error);
-    res.status(500).json({ error: 'Registration failed' });
+    res.status(500).json({ 
+      error: 'server_error',
+      message: 'Registration failed. Please try again.' 
+    });
   }
 });
 
@@ -88,7 +97,10 @@ router.post('/login', async (req, res) => {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return res.status(400).json({ error: 'Email and password required' });
+      return res.status(400).json({ 
+        error: 'validation_error',
+        message: 'Email and password required' 
+      });
     }
 
     // Get user
@@ -99,14 +111,20 @@ router.post('/login', async (req, res) => {
       .limit(1);
 
     if (!user || !user.passwordHash) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+      return res.status(401).json({ 
+        error: 'invalid_credentials',
+        message: 'Invalid email or password' 
+      });
     }
 
     // Verify password
     const isValid = await bcrypt.compare(password, user.passwordHash);
 
     if (!isValid) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+      return res.status(401).json({ 
+        error: 'invalid_credentials',
+        message: 'Invalid email or password' 
+      });
     }
 
     // Generate JWT token
@@ -133,7 +151,10 @@ router.post('/login', async (req, res) => {
 
   } catch (error) {
     console.error('Login error:', error);
-    res.status(500).json({ error: 'Login failed' });
+    res.status(500).json({ 
+      error: 'server_error',
+      message: 'Login failed. Please try again.' 
+    });
   }
 });
 
@@ -147,7 +168,10 @@ router.get('/me', async (req, res) => {
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'No token provided' });
+      return res.status(401).json({ 
+        error: 'no_token',
+        message: 'No token provided' 
+      });
     }
 
     const token = authHeader.substring(7);
@@ -156,7 +180,10 @@ router.get('/me', async (req, res) => {
     try {
       decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
     } catch {
-      return res.status(401).json({ error: 'Invalid token' });
+      return res.status(401).json({ 
+        error: 'invalid_token',
+        message: 'Invalid or expired token' 
+      });
     }
 
     const [user] = await db
@@ -166,7 +193,10 @@ router.get('/me', async (req, res) => {
       .limit(1);
 
     if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+      return res.status(404).json({ 
+        error: 'user_not_found',
+        message: 'User not found' 
+      });
     }
 
     res.json({
@@ -180,7 +210,10 @@ router.get('/me', async (req, res) => {
 
   } catch (error) {
     console.error('Get user error:', error);
-    res.status(500).json({ error: 'Failed to get user' });
+    res.status(500).json({ 
+      error: 'server_error',
+      message: 'Failed to get user. Please try again.' 
+    });
   }
 });
 

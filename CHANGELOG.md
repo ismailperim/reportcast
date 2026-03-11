@@ -7,12 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### In Progress
-- React frontend (Phase 3)
-- Real-time progress updates
-- User dashboard
-- Email notifications
-- Subscription plans (infrastructure ready)
+### Planned
+- Web audio player (no direct download)
+- Public/Private share links
+- Listen analytics dashboard
+- Frontend UI polish
+
+---
+
+## [0.4.0] - 2026-03-11
+
+### Added
+- **Piper-GPL TTS Integration** 🎙️
+  - Replaced OpenedAI-Speech with pure Piper-GPL
+  - 19 pre-loaded voices (Turkish, English, German, French, Spanish, Russian)
+  - 100+ language support available
+  - WAV → MP3 conversion via ffmpeg
+  - Free, self-hosted, CPU-only inference
+- **TTS Voice Sync Service**
+  - Environment-based provider activation
+  - Auto-enable/disable voices on API startup
+  - Piper always active (free on-premise)
+  - OpenAI/ElevenLabs require explicit enablement
+- **Auth Middleware Enhancement**
+  - Support for query parameter tokens (`?token=...`)
+  - Download links now work with URL tokens
+- **Local Disk Storage**
+  - Removed MinIO dependency (CPU architecture issues)
+  - Direct file serving from `/app/outputs/`
+  - Simplified deployment
+
+### Changed
+- TTS provider selection now based on voice's provider field
+- Worker job interface updated with `piper` type
+- Default TTS provider: `piper` (was `openedai`)
+- Docker Compose: S3/MinIO services disabled by default
+- Frontend path: `packages/web` → `packages/frontend`
+
+### Fixed
+- Worker ffmpeg installation (Alpine package)
+- Provider factory case for Piper-GPL
+- Download endpoint: removed unnecessary `s3Key` check
+- Upload endpoint: provider auto-detection from voice
+- Missing `userId` and `tier` in worker destructure
+
+### Technical
+- Dockerfile.piper-http: Custom Piper-GPL HTTP server
+- PiperTTSProvider: OpenAI-compatible interface
+- 7 language voices pre-downloaded in Docker image
+- NumPy version pinned to <2.0 for x86-64-v2 compatibility
 
 ---
 

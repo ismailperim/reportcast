@@ -28,13 +28,22 @@ export async function authenticateUser(
 ): Promise<void> {
   try {
     const authHeader = req.headers.authorization;
+    let token: string | undefined;
 
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    // Try header first (Bearer token)
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7);
+    }
+    
+    // Fallback to query parameter (for download links)
+    if (!token && req.query.token) {
+      token = req.query.token as string;
+    }
+
+    if (!token) {
       res.status(401).json({ error: 'No token provided' });
       return;
     }
-
-    const token = authHeader.substring(7);
 
     let decoded;
     try {

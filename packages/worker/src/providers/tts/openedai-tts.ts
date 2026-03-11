@@ -53,30 +53,45 @@ export class OpenedAITTSProvider implements TTSProvider {
     // OpenAI-compatible API endpoint
     const url = `${this.baseURL}/v1/audio/speech`;
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'tts-1-hd', // Model name (ignored by openedai-speech)
-        voice, // Piper voice name (e.g., en_US-lessac-medium)
-        input: text,
-        speed,
-        response_format: format,
-      }),
-    });
+    console.log(`[TTS] Sending request to ${url}`);
+    console.log(`[TTS] Text length: ${text.length} chars, Voice: ${voice}`);
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout
 
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(
-        `OpenedAI TTS API error (${response.status}): ${error}\n` +
-        `Make sure TTS server is running: ${this.baseURL}`
-      );
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'tts-1', // Use tts-1 (lighter model)
+          voice, // Piper voice name (e.g., en_US-lessac-medium)
+          input: text,
+          // Removed speed and response_format for minimal payload
+        }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(
+          `OpenedAI TTS API error (${response.status}): ${error}\n` +
+          `Make sure TTS server is running: ${this.baseURL}`
+        );
+      }
+
+      const buffer = Buffer.from(await response.arrayBuffer());
+      await fs.writeFile(outputPath, buffer);
+    } catch (error) {
+      clearTimeout(timeoutId);
+      if ((error as Error).name === 'AbortError') {
+        throw new Error(`TTS request timeout after 60s (${this.baseURL})`);
+      }
+      throw error;
     }
-
-    const buffer = Buffer.from(await response.arrayBuffer());
-    await fs.writeFile(outputPath, buffer);
   }
 
   async listVoices(): Promise<string[]> {

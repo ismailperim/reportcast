@@ -9,6 +9,7 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAME_API: ${{ github.repository }}-api
   IMAGE_NAME_WORKER: ${{ github.repository }}-worker
+  IMAGE_NAME_TTS: ${{ github.repository }}-piper-tts
 
 jobs:
   build-and-push:
@@ -81,6 +82,27 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
       
+      - name: Extract metadata for Piper TTS
+        id: meta-tts
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_TTS }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable={{is_default_branch}}
+      
+      - name: Build and push Piper TTS image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile.piper-http
+          push: true
+          tags: ${{ steps.meta-tts.outputs.tags }}
+          labels: ${{ steps.meta-tts.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -92,8 +114,12 @@ jobs:
             # Pull images
             docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_API }}:${{ steps.version.outputs.VERSION }}
             docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_WORKER }}:${{ steps.version.outputs.VERSION }}
+            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_TTS }}:${{ steps.version.outputs.VERSION }}
             
             # Or use latest
             docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_API }}:latest
             docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_WORKER }}:latest
+            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_TTS }}:latest
             ```
+            
+            **Piper TTS:** 19 voices pre-loaded (Turkish, English, German, French, Spanish, Russian)

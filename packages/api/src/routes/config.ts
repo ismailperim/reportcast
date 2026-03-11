@@ -52,6 +52,13 @@ configRouter.get('/ai-models', async (req, res) => {
       .from(aiModels)
       .where(eq(aiModels.isActive, true));
 
+    // Filter by available API keys
+    const availableProviders = new Set<string>();
+    if (process.env.OPENAI_API_KEY) availableProviders.add('openai');
+    if (process.env.ANTHROPIC_API_KEY) availableProviders.add('anthropic');
+
+    models = models.filter(m => availableProviders.has(m.provider));
+
     // In SaaS mode, filter premium models unless user is authenticated & paid
     if (isFeatureEnabled('premiumModels')) {
       // TODO: Check user subscription status
@@ -73,9 +80,39 @@ configRouter.get('/ai-models', async (req, res) => {
 configRouter.get('/tts-voices', async (req, res) => {
   try {
     let voices = await db
-      .select()
+      .select({
+        id: ttsVoices.id,
+        provider: ttsVoices.provider,
+        voiceId: ttsVoices.voiceId,
+        displayName: ttsVoices.displayName,
+        description: ttsVoices.description,
+        language: ttsVoices.language,
+        isPremium: ttsVoices.isPremium,
+        isDefault: ttsVoices.isDefault,
+      })
       .from(ttsVoices)
       .where(eq(ttsVoices.isActive, true));
+
+    // Filter by available API keys/services AND enablement flags
+    const availableProviders = new Set<string>();
+    
+    // Piper (self-hosted) is always available
+    availableProviders.add('piper');
+    
+    // Legacy: OpenedAI (if still in use)
+    availableProviders.add('openedai');
+    
+    // OpenAI TTS - requires both API key AND enablement flag
+    if (process.env.OPENAI_API_KEY && process.env.ENABLE_OPENAI_TTS === 'true') {
+      availableProviders.add('openai');
+    }
+    
+    // ElevenLabs TTS - requires both API key AND enablement flag
+    if (process.env.ELEVENLABS_API_KEY && process.env.ENABLE_ELEVENLABS_TTS === 'true') {
+      availableProviders.add('elevenlabs');
+    }
+
+    voices = voices.filter(v => availableProviders.has(v.provider));
 
     // In SaaS mode, filter premium voices unless user is authenticated & paid
     if (isFeatureEnabled('premiumModels')) {

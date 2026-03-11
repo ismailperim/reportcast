@@ -1,0 +1,25 @@
+# Voice to Speaker mapping for OpenedAI-Speech
+# Maps voice names to Piper models
+
+# Turkish voice (Piper)
+turkish:
+  model: voices/tr_TR-dfki-medium.onnx
+
+# English voices (Piper models)
+alloy:
+  model: voices/en_US-lessac-medium.onnx
+  
+echo:
+  model: voices/en_US-lessac-medium.onnx
+
+fable:
+  model: voices/en_GB-alan-medium.onnx
+
+nova:
+  model: voices/en_US-amy-medium.onnx
+
+onyx:
+  model: voices/en_US-ryan-high.onnx
+
+shimmer:
+  model: voices/en_US-amy-medium.onnx

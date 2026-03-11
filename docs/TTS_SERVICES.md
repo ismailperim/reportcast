@@ -6,25 +6,83 @@ ReportCast supports multiple TTS providers through a unified interface.
 
 ```
 ┌──────────────┐
-│    Worker    │ (Node.js)
+│    Worker    │ (Node.js + ffmpeg)
 └──────┬───────┘
        │
-       ├─────────────┐
-       │             │
-   ┌───▼────┐   ┌───▼──────────┐
-   │ Cloud  │   │ Self-Hosted  │
-   │  APIs  │   │  Services    │
-   └────────┘   └──────────────┘
-       │              │
-   ┌───▼────┐    ┌───▼─────────┐
-   │OpenAI  │    │ openedai    │ ← Piper + XTTS
-   │Eleven  │    │  -speech    │   (Docker)
-   └────────┘    └─────────────┘
+       ├─────────────┬─────────────┐
+       │             │             │
+   ┌───▼────┐   ┌───▼──────┐  ┌──▼──────┐
+   │ Cloud  │   │  Piper   │  │OpenedAI │
+   │  APIs  │   │   GPL    │  │ Speech  │
+   └────────┘   └──────────┘  └─────────┘
+       │             │             │
+   ┌───▼────┐    (HTTP)        (Legacy)
+   │OpenAI  │    900+ voices
+   │Eleven  │    100+ langs
+   └────────┘    FREE ⭐
 ```
 
 ## Provider Options
 
-### 1. OpenedAI Speech (Recommended for Free Tier)
+### 1. Piper-GPL (Default ⭐ Recommended)
+
+**What:** Pure Piper TTS with HTTP API  
+**GitHub:** https://github.com/OHF-Voice/piper1-gpl  
+**Cost:** FREE (self-hosted, GPL license)  
+**Setup:** Docker (custom image)
+
+**Features:**
+- ✅ 900+ voices across 100+ languages
+- ✅ CPU-only inference (no GPU needed)
+- ✅ Very lightweight (~200MB RAM)
+- ✅ Fast real-time synthesis
+- ✅ Simple HTTP POST API
+- ✅ Pre-loaded voices: Turkish, English (US/UK), German, French, Spanish, Russian
+- ✅ WAV output (ffmpeg converts to MP3)
+
+**Included Voices (19):**
+- Turkish: `tr_TR-dfki-medium`, `tr_TR-fettah-medium`
+- English US: `en_US-lessac-medium/high`, `en_US-amy-medium`, `en_US-ryan-high`, `en_US-libritts-high`
+- English UK: `en_GB-alan-medium`, `en_GB-alba-medium`, `en_GB-southern_english_female-medium`
+- German: `de_DE-thorsten-medium`, `de_DE-karlsson-low`
+- French: `fr_FR-upmc-medium`, `fr_FR-siwis-medium`
+- Spanish: `es_ES-sharvard-medium`, `es_ES-carlfm-x_low`, `es_MX-ald-medium`
+- Russian: `ru_RU-ruslan-medium`, `ru_RU-dmitri-medium`
+
+**Start service:**
+```bash
+docker compose up tts-server
+# Service runs on http://localhost:5000
+```
+
+**API Usage:**
+```bash
+curl -X POST http://localhost:5000 \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Hello world", "voice": "en_US-lessac-medium"}' \
+  -o output.wav
+```
+
+**Docker Build:**
+```dockerfile
+# See Dockerfile.piper-http
+FROM python:3.11-slim
+RUN pip install 'numpy<2.0' piper-tts[http]
+RUN python3 -m piper.download_voices tr_TR-dfki-medium
+# ... (downloads 7 language packs)
+CMD ["python3", "-m", "piper.http_server", "--host", "0.0.0.0"]
+```
+
+**Why Piper-GPL?**
+- Fully open-source (GPL)
+- Actively maintained by OHF-Voice
+- No API costs
+- Works on any CPU
+- Perfect for on-premise deployments
+
+---
+
+### 2. OpenedAI Speech (Legacy)
 
 **What:** OpenAI-compatible API with Piper backend  
 **GitHub:** https://github.com/matatonic/openedai-speech  

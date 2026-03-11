@@ -23,7 +23,7 @@ export class ReportProcessor {
     inputPath: string,
     outputPath: string,
     options: ProcessOptions = {}
-  ): Promise<void> {
+  ): Promise<{ extractedText: string; generatedScript: string }> {
     const { aiOptions, ttsOptions, verbose = true } = options;
 
     try {
@@ -68,6 +68,8 @@ export class ReportProcessor {
         console.log(`   └─ Saved to ${outputPath}`);
         console.log('\n✅ Done!\n');
       }
+
+      return { extractedText: text, generatedScript: script };
     } catch (error) {
       if (verbose) {
         console.error('\n❌ Error:', error instanceof Error ? error.message : error);

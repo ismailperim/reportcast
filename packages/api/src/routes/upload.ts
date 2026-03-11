@@ -7,7 +7,7 @@ import { reportQueue } from '../queue/index.js';
 import { authenticateUser } from '../middleware/auth.js';
 import { isFeatureEnabled } from '../config/deployment.js';
 import { getPricingConfig, calculateRequiredCredits } from '../services/pricing-service.js';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import path from 'path';
 import fs from 'fs/promises';
 
@@ -56,7 +56,8 @@ router.post('/', authenticateUser, upload.single('file'), async (req, res) => {
 
     const userId = req.user!.id;
     const filePath = req.file.path;
-    const filename = req.file.originalname;
+    const originalFilename = req.file.originalname;
+    const savedFilename = path.basename(req.file.path); // Multer'ın oluşturduğu gerçek dosya adı
     const fileSize = req.file.size;
 
     // Extract PDF metadata
@@ -88,7 +89,7 @@ router.post('/', authenticateUser, upload.single('file'), async (req, res) => {
     // Create report record
     const [report] = await db.insert(reports).values({
       userId,
-      filename,
+      filename: savedFilename, // Gerçek dosya adı (multer'ın oluşturduğu)
       fileSize,
       pageCount,
       tier,
@@ -98,7 +99,7 @@ router.post('/', authenticateUser, upload.single('file'), async (req, res) => {
 
     const response: any = {
       reportId: report.id,
-      filename,
+      filename: originalFilename, // Kullanıcıya orijinal dosya adını göster
       pageCount,
       status: 'pending',
     };
@@ -157,8 +158,10 @@ router.post('/', authenticateUser, upload.single('file'), async (req, res) => {
 router.post('/:reportId/confirm', authenticateUser, async (req, res) => {
   try {
     const { reportId } = req.params;
-    const { language = 'auto', tone = 'professional', aiProvider = 'openai', aiModel = 'gpt-4-turbo', ttsProvider = 'openedai', ttsVoice = 'auto' } = req.body;
+    const { language = 'auto', tone = 'professional', aiProvider = 'openai', aiModel = 'gpt-4-turbo', ttsVoice = 'auto' } = req.body;
     const userId = req.user!.id;
+    
+    let ttsProvider: 'piper' | 'openedai' | 'openai' | 'elevenlabs' = 'piper'; // Default to Piper
 
     // Get report
     const [report] = await db.select().from(reports).where(eq(reports.id, reportId)).limit(1);
@@ -208,10 +211,38 @@ router.post('/:reportId/confirm', authenticateUser, async (req, res) => {
       console.log(`✅ Deducted ${requiredCredits} credits from user ${userId} (had ${user.creditsRemaining}, now ${user.creditsRemaining - requiredCredits})`);
     }
 
-    // Premium model/voice check (SaaS only)
+    // Get TTS voice provider (always, not just for premium check)
+    if (ttsVoice !== 'auto') {
+      const { ttsVoices } = await import('../db/schema.js');
+      const [selectedVoice] = await db
+        .select()
+        .from(ttsVoices)
+        .where(and(
+          eq(ttsVoices.voiceId, ttsVoice),
+          eq(ttsVoices.isActive, true)
+        ))
+        .limit(1);
+
+      if (!selectedVoice) {
+        return res.status(400).json({ error: 'Selected TTS voice not available' });
+      }
+      
+      // Use voice's provider
+      ttsProvider = selectedVoice.provider as 'piper' | 'openedai' | 'openai' | 'elevenlabs';
+
+      // Premium voice check (SaaS only)
+      if (isFeatureEnabled('premiumModels') && selectedVoice.isPremium && req.user!.plan === 'free') {
+        return res.status(403).json({
+          error: 'Premium voice requires paid plan',
+          voice: selectedVoice.displayName,
+          upgrade: 'Upgrade to Team or Business plan',
+        });
+      }
+    }
+
+    // Premium model check (SaaS only)
     if (isFeatureEnabled('premiumModels')) {
-      const { aiModels, ttsVoices } = await import('../db/schema.js');
-      const { and } = await import('drizzle-orm');
+      const { aiModels } = await import('../db/schema.js');
 
       // Check AI model
       const [selectedModel] = await db
@@ -233,30 +264,6 @@ router.post('/:reportId/confirm', authenticateUser, async (req, res) => {
           model: selectedModel.displayName,
           upgrade: 'Upgrade to Team or Business plan',
         });
-      }
-
-      // Check TTS voice (if not auto)
-      if (ttsVoice !== 'auto') {
-        const [selectedVoice] = await db
-          .select()
-          .from(ttsVoices)
-          .where(and(
-            eq(ttsVoices.voiceId, ttsVoice),
-            eq(ttsVoices.isActive, true)
-          ))
-          .limit(1);
-
-        if (!selectedVoice) {
-          return res.status(400).json({ error: 'Selected TTS voice not available' });
-        }
-
-        if (selectedVoice.isPremium && req.user!.plan === 'free') {
-          return res.status(403).json({
-            error: 'Premium voice requires paid plan',
-            voice: selectedVoice.displayName,
-            upgrade: 'Upgrade to Team or Business plan',
-          });
-        }
       }
     }
 

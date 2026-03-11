@@ -40,6 +40,8 @@ export const reports = pgTable('reports', {
   isPublic: boolean('is_public').default(false), // Public share enabled
   listenCount: integer('listen_count').default(0), // Total listens
   lastListenedAt: timestamp('last_listened_at'),
+  extractedText: text('extracted_text'), // Raw text from PDF
+  generatedScript: text('generated_script'), // AI-generated podcast script
   errorMessage: text('error_message'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   completedAt: timestamp('completed_at'),

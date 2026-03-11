@@ -1,5 +1,8 @@
 FROM node:22-alpine
 
+# Install ffmpeg for WAV to MP3 conversion
+RUN apk add --no-cache ffmpeg
+
 # Install pnpm
 RUN corepack enable && corepack prepare pnpm@latest --activate
 

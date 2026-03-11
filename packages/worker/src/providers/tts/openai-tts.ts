@@ -23,7 +23,7 @@ export class OpenAITTSProvider implements TTSProvider {
 
     // OpenAI TTS supports: alloy, echo, fable, onyx, nova, shimmer
     const response = await this.client.audio.speech.create({
-      model: 'tts-1-hd', // or tts-1 for faster/cheaper
+      model: 'tts-1', // Faster and cheaper than tts-1-hd
       voice: voice as 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer',
       input: text,
       speed,

@@ -65,7 +65,7 @@ interface ReportJobData {
   tier: string;
   aiProvider: 'openai' | 'anthropic';
   aiModel?: string; // Model ID (gpt-4-turbo, claude-sonnet-4, etc.)
-  ttsProvider: 'openedai' | 'openai' | 'elevenlabs';
+  ttsProvider: 'piper' | 'openedai' | 'openai' | 'elevenlabs';
   ttsVoice?: string; // Voice ID or 'auto'
   language: string;
   tone: 'professional' | 'casual' | 'storytelling';
@@ -76,8 +76,10 @@ const worker = new Worker<ReportJobData>(
   'report-processing',
   async (job) => {
     const { 
-      reportId, 
-      filePath, 
+      reportId,
+      userId,
+      filePath,
+      tier,
       aiProvider, 
       aiModel,
       ttsProvider, 
@@ -136,24 +138,42 @@ const worker = new Worker<ReportJobData>(
         console.log(`[Job ${job.id}] Auto-selected voice: ${selectedVoice}`);
       }
 
-      // Create providers with custom model
+      // Create AI provider
       const aiProviderInstance = ProviderFactory.createAIProvider(aiProvider, aiApiKey, aiModel);
+
+      // Step 1: Extract text from PDF
+      console.log('📄 Extracting text from PDF...');
+      const finalExtractedText = await pdfParser.extractText(filePath);
+      console.log(`   └─ Extracted ${finalExtractedText.length} characters`);
+
+      // Step 2: Generate script with AI
+      console.log(`\n🤖 Generating script with ${aiProviderInstance.name}...`);
+      const generatedScript = await aiProviderInstance.generateScript(finalExtractedText, {
+        tone,
+        systemPrompt: promptTemplate.systemPrompt,
+        userPromptTemplate: promptTemplate.userPrompt,
+      });
+      console.log(`   └─ Generated ${generatedScript.length} characters (~${Math.ceil(generatedScript.split(' ').length / 150)} min)`);
+
+      // Step 3: Save extracted text and generated script BEFORE TTS
+      // This ensures we have the data even if TTS fails
+      console.log('\n💾 Saving extracted text and generated script to database...');
+      await db
+        .update(reports)
+        .set({
+          extractedText: finalExtractedText,
+          generatedScript: generatedScript,
+        })
+        .where(eq(reports.id, reportId));
+      console.log('   ✅ Scripts saved to database');
+
+      // Step 4: Generate audio with TTS
+      console.log(`\n🎙️  Converting to audio with ${ttsProvider}...`);
       const ttsProviderInstance = ProviderFactory.createTTSProvider(ttsProvider, ttsApiKey);
-
-      // Process report with custom prompts
       const outputPath = `/app/outputs/${reportId}.mp3`;
-      const processor = new ReportProcessor(aiProviderInstance, ttsProviderInstance);
-
-      await processor.process(filePath, outputPath, {
-        aiOptions: {
-          tone: tone,
-          systemPrompt: promptTemplate.systemPrompt,
-          userPromptTemplate: promptTemplate.userPrompt,
-        },
-        ttsOptions: {
-          voice: selectedVoice,
-        },
-        verbose: true,
+      
+      await ttsProviderInstance.textToSpeech(generatedScript, outputPath, {
+        voice: selectedVoice,
       });
 
       // Get file stats
@@ -168,7 +188,7 @@ const worker = new Worker<ReportJobData>(
       const pdfSizeKB = fileStats.size / 1024;
       const aiCostCents = Math.ceil(pdfSizeKB * 0.001); // $0.001 per KB estimate
 
-      const ttsCostCents = ttsProvider === 'openedai' ? 0 : 5; // OpenedAI is free
+      const ttsCostCents = (ttsProvider === 'piper' || ttsProvider === 'openedai') ? 0 : 5; // Piper and OpenedAI are free
 
       const processingTimeMs = Date.now() - startTime;
 
@@ -209,6 +229,8 @@ const worker = new Worker<ReportJobData>(
           audioUrl,
           audioSize,
           audioDurationSeconds,
+          extractedText: finalExtractedText,
+          generatedScript,
           aiCostCents,
           ttsCostCents,
           processingTimeMs,

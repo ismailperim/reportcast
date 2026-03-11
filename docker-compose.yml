@@ -1,4 +1,7 @@
-version: '3.8'
+# ReportCast - Full Stack Docker Compose
+# Version: 0.4.0
+# TTS: Piper-GPL (free, self-hosted)
+# Storage: Local disk (MinIO optional)
 
 services:
   # PostgreSQL Database
@@ -36,53 +39,48 @@ services:
       timeout: 3s
       retries: 5
 
-  # MinIO (S3-compatible object storage)
-  minio:
-    image: minio/minio:latest
-    container_name: reportcast-minio
-    restart: unless-stopped
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
-    ports:
-      - "9000:9000"  # S3 API
-      - "9001:9001"  # Web Console
-    volumes:
-      - minio_data:/data
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+  # MinIO (Optional - S3-compatible object storage)
+  # Disabled by default (using local disk storage)
+  # Uncomment to enable S3 storage
+  # minio:
+  #   image: minio/minio:latest
+  #   container_name: reportcast-minio
+  #   restart: unless-stopped
+  #   command: server /data --console-address ":9001"
+  #   environment:
+  #     MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+  #     MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+  #   ports:
+  #     - "9000:9000"  # S3 API
+  #     - "9001:9001"  # Web Console
+  #   volumes:
+  #     - minio_data:/data
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
 
-  # TTS Server (OpenedAI Speech - Piper backend)
+  # TTS Server (Piper-GPL - Free, Self-hosted)
+  # 19 voices pre-loaded (TR, EN, DE, FR, ES, RU)
   tts-server:
-    image: ghcr.io/matatonic/openedai-speech:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.piper-http
+    image: reportcast-piper-tts:${TTS_VERSION:-latest}
     container_name: reportcast-tts
     restart: unless-stopped
     ports:
-      - "8000:8000"
-    volumes:
-      - tts_voices:/app/voices
-      - tts_config:/app/config
-    environment:
-      - PRELOAD=xtts
-      - TTS_HOST=0.0.0.0
-      - TTS_PORT=8000
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/v1/models"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
+      - "5000:5000"
+    # No healthcheck - Piper doesn't have GET endpoint
 
   # API Server
   api:
-    image: ghcr.io/ismailperim/reportcast-api:${API_VERSION:-latest}
+    # image: ghcr.io/ismailperim/reportcast-api:${API_VERSION:-latest}
     build:
       context: .
       dockerfile: packages/api/Dockerfile
+    image: reportcast-api:latest
     container_name: reportcast-api
     restart: unless-stopped
     working_dir: /app/packages/api
@@ -95,6 +93,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
+      DEPLOYMENT_MODE: saas
       DB_HOST: postgres
       DB_PORT: 5432
       DB_USER: reportcast
@@ -102,18 +101,22 @@ services:
       DB_NAME: reportcast
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      TTS_SERVER_URL: http://tts-server:8000
+      TTS_SERVER_URL: http://tts-server:5000
       JWT_SECRET: ${JWT_SECRET:-change_me_in_production}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
-      S3_PROVIDER: ${S3_PROVIDER:-minio}
-      S3_ENDPOINT: ${S3_ENDPOINT:-http://minio:9000}
-      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-minioadmin}
-      S3_SECRET_KEY: ${S3_SECRET_KEY:-minioadmin}
-      S3_BUCKET: ${S3_BUCKET:-reportcast}
-      S3_REGION: ${S3_REGION:-us-east-1}
-      S3_PUBLIC_URL: ${S3_PUBLIC_URL:-http://localhost:9000}
+      ELEVENLABS_API_KEY: ${ELEVENLABS_API_KEY}
+      ENABLE_OPENAI_TTS: ${ENABLE_OPENAI_TTS:-false}
+      ENABLE_ELEVENLABS_TTS: ${ENABLE_ELEVENLABS_TTS:-false}
+      # S3 disabled (using local disk)
+      # S3_PROVIDER: ${S3_PROVIDER}
+      # S3_ENDPOINT: ${S3_ENDPOINT}
+      # S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      # S3_SECRET_KEY: ${S3_SECRET_KEY}
+      # S3_BUCKET: ${S3_BUCKET:-reportcast}
+      # S3_REGION: ${S3_REGION:-us-east-1}
+      # S3_PUBLIC_URL: ${S3_PUBLIC_URL}
     ports:
       - "3000:3000"
     volumes:
@@ -127,10 +130,11 @@ services:
 
   # BullMQ Worker
   worker:
-    image: ghcr.io/ismailperim/reportcast-worker:${WORKER_VERSION:-latest}
+    # image: ghcr.io/ismailperim/reportcast-worker:${WORKER_VERSION:-latest}
     build:
       context: .
       dockerfile: packages/worker/Dockerfile
+    image: reportcast-worker:latest
     container_name: reportcast-worker
     restart: unless-stopped
     working_dir: /app/packages/worker
@@ -141,9 +145,10 @@ services:
       redis:
         condition: service_healthy
       tts-server:
-        condition: service_healthy
+        condition: service_started
     environment:
       NODE_ENV: production
+      WORKER_CONCURRENCY: 1
       DB_HOST: postgres
       DB_PORT: 5432
       DB_USER: reportcast
@@ -151,15 +156,19 @@ services:
       DB_NAME: reportcast
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      TTS_SERVER_URL: http://tts-server:8000
+      TTS_SERVER_URL: http://tts-server:5000
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
-      S3_PROVIDER: ${S3_PROVIDER:-minio}
-      S3_ENDPOINT: ${S3_ENDPOINT:-http://minio:9000}
-      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-minioadmin}
-      S3_SECRET_KEY: ${S3_SECRET_KEY:-minioadmin}
-      S3_BUCKET: ${S3_BUCKET:-reportcast}
-      S3_REGION: ${S3_REGION:-us-east-1}
+      ELEVENLABS_API_KEY: ${ELEVENLABS_API_KEY}
+      ENABLE_OPENAI_TTS: ${ENABLE_OPENAI_TTS:-false}
+      ENABLE_ELEVENLABS_TTS: ${ENABLE_ELEVENLABS_TTS:-false}
+      # S3 disabled (using local disk)
+      # S3_PROVIDER: ${S3_PROVIDER}
+      # S3_ENDPOINT: ${S3_ENDPOINT}
+      # S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      # S3_SECRET_KEY: ${S3_SECRET_KEY}
+      # S3_BUCKET: ${S3_BUCKET:-reportcast}
+      # S3_REGION: ${S3_REGION:-us-east-1}
     volumes:
       - ./uploads:/app/uploads
       - ./outputs:/app/outputs
@@ -169,12 +178,8 @@ volumes:
     driver: local
   redis_data:
     driver: local
-  tts_voices:
-    driver: local
-  tts_config:
-    driver: local
-  minio_data:
-    driver: local
+  # minio_data:  # Optional - uncomment if using MinIO
+  #   driver: local
 
 networks:
   default:

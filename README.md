@@ -8,8 +8,8 @@ Nobody reads your reports. But they'll listen.
 
 - 📄 **PDF Parser** - Extract text from any document
 - 🤖 **AI Script Generator** - Multiple AI providers (OpenAI, Anthropic)
-- 🎙️ **Multi-Provider TTS** - Cloud (OpenAI, ElevenLabs) or Self-hosted (Piper)
-- 🌍 **Multi-Language** - Turkish, English + 40+ languages (Piper)
+- 🎙️ **Multi-Provider TTS** - Cloud (OpenAI, ElevenLabs) or Self-hosted (Piper-GPL)
+- 🌍 **Multi-Language** - Turkish, English, German, French, Spanish, Russian + 100+ languages (Piper-GPL)
 - 🐳 **Docker Services** - Full stack with PostgreSQL, Redis, TTS
 - 🔌 **Pluggable Architecture** - Easy to add new providers
 - 💾 **S3-Compatible Storage** - MinIO, AWS S3, DigitalOcean Spaces, Cloudflare R2, Backblaze B2
@@ -24,20 +24,22 @@ Nobody reads your reports. But they'll listen.
 ```
 reportcast/
 ├── packages/
-│   ├── worker/    # Core processing engine ✅
-│   ├── api/       # REST API ✅
-│   └── web/       # Frontend (In Progress)
+│   ├── worker/    # BullMQ worker (PDF parse + AI + TTS) ✅
+│   ├── api/       # REST API + Auth + Admin ✅
+│   └── frontend/  # React + Vite frontend ✅
 ├── docker-compose.yml  # Full stack deployment
 └── docs/          # Documentation
 ```
 
 ### TTS Options
 
-| Provider | Cost | Setup | Use Case |
-|----------|------|-------|----------|
-| **OpenedAI** ⭐ | FREE | Docker | Self-hosted, OSS |
-| OpenAI TTS | $0.045/podcast | API Key | Cloud, convenient |
-| ElevenLabs | $0.30/podcast | API Key | Premium quality |
+| Provider | Cost | Setup | Languages | Use Case |
+|----------|------|-------|-----------|----------|
+| **Piper-GPL** ⭐ | FREE | Docker | 100+ | Self-hosted, on-premise |
+| OpenAI TTS | $0.015/1K chars | API Key | 50+ | Cloud, convenient |
+| ElevenLabs | $0.30/1K chars | API Key | 30+ | Premium quality |
+
+**Default:** Piper-GPL (free, 19 pre-loaded voices)
 
 ## Getting Started
 

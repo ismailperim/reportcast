@@ -5,6 +5,7 @@ import { readFileSync } from 'fs';
 import { checkDatabaseConnection } from './db/index.js';
 import { runMigrationsIfNeeded } from './db/auto-migrate.js';
 import { initializeStorage } from './storage/s3-storage.js';
+import { syncTTSVoices } from './services/tts-sync.js';
 import uploadRouter from './routes/upload.js';
 import reportsRouter from './routes/reports.js';
 import authRouter from './routes/auth.js';
@@ -12,6 +13,7 @@ import shareRouter from './routes/share.js';
 import adminRouter from './routes/admin.js';
 import paymentsRouter from './routes/payments.js';
 import pricingRouter from './routes/pricing.js';
+import configRouter from './routes/config.js';
 import { getDeploymentConfig } from './config/deployment.js';
 
 // Load environment variables
@@ -53,6 +55,7 @@ app.get('/health', async (req, res) => {
 
 // API routes
 app.use('/api/auth', authRouter);
+app.use('/api/config', configRouter);
 app.use('/api/upload', uploadRouter);
 app.use('/api/reports', reportsRouter);
 app.use('/api/share', shareRouter);
@@ -82,6 +85,9 @@ async function startServer() {
   try {
     // Run database migrations first
     await runMigrationsIfNeeded();
+
+    // Sync TTS voice availability based on env
+    await syncTTSVoices();
 
     // Initialize S3 storage (if configured)
     if (process.env.S3_PROVIDER) {
