@@ -63,8 +63,9 @@ app.use('/api/admin', adminRouter);
 app.use('/api/payments', paymentsRouter);
 app.use('/api/pricing', pricingRouter);
 
-// Public routes (no /api prefix)
-app.use('/listen', shareRouter);
+// Public audio streaming endpoint
+// Note: /listen is now a frontend route (React SPA)
+app.use('/api/stream', shareRouter);
 
 // 404 handler
 app.use((req, res) => {

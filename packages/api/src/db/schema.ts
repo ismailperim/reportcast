@@ -19,7 +19,9 @@ export const users = pgTable('users', {
 export const reports = pgTable('reports', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').notNull().references(() => users.id),
-  filename: text('filename').notNull(),
+  filename: text('filename').notNull(), // Server-generated hash filename
+  originalFilename: text('original_filename'), // User's uploaded filename
+  title: text('title'), // AI-generated title from content
   fileSize: integer('file_size').notNull(), // bytes
   pageCount: integer('page_count').notNull(),
   tier: text('tier').notNull(), // short, medium, long, enterprise

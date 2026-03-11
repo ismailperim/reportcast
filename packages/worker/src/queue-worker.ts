@@ -117,11 +117,39 @@ const worker = new Worker<ReportJobData>(
       const extractedText = await pdfParser.extractText(filePath);
       console.log(`[Job ${job.id}] Extracted ${extractedText.length} characters`);
 
-      // Detect language if auto
+      // Create AI provider (for language detection if needed)
+      const aiProviderInstance = ProviderFactory.createAIProvider(aiProvider, aiApiKey, aiModel);
+
+      // Detect language if auto (use AI for accuracy)
       let detectedLanguage = language;
       if (language === 'auto') {
-        detectedLanguage = await detectLanguage(extractedText);
-        console.log(`[Job ${job.id}] Detected language: ${detectedLanguage}`);
+        try {
+          console.log(`[Job ${job.id}] Detecting language with AI...`);
+          const langPrompt = `What is the primary language of this document? Respond with ONLY the language code: en, tr, de, fr, es, or ru.
+
+Content:
+${extractedText.substring(0, 1000)}...`;
+
+          const langResponse = await aiProviderInstance.generateScript(langPrompt, {
+            tone: 'professional',
+            systemPrompt: 'You are a language detector. Return only the language code.',
+            userPromptTemplate: '{text}',
+          });
+
+          const detectedCode = langResponse.trim().toLowerCase().match(/\b(en|tr|de|fr|es|ru)\b/)?.[1];
+          if (detectedCode) {
+            detectedLanguage = detectedCode;
+            console.log(`[Job ${job.id}] AI detected language: ${detectedLanguage}`);
+          } else {
+            // Fallback to simple detection
+            detectedLanguage = await detectLanguage(extractedText);
+            console.log(`[Job ${job.id}] Fallback detected language: ${detectedLanguage}`);
+          }
+        } catch (error) {
+          console.warn(`[Job ${job.id}] AI language detection failed, using fallback`);
+          detectedLanguage = await detectLanguage(extractedText);
+          console.log(`[Job ${job.id}] Fallback detected language: ${detectedLanguage}`);
+        }
       }
 
       // Get prompt template from database
@@ -138,9 +166,6 @@ const worker = new Worker<ReportJobData>(
         console.log(`[Job ${job.id}] Auto-selected voice: ${selectedVoice}`);
       }
 
-      // Create AI provider
-      const aiProviderInstance = ProviderFactory.createAIProvider(aiProvider, aiApiKey, aiModel);
-
       // Step 1: Extract text from PDF
       console.log('📄 Extracting text from PDF...');
       const finalExtractedText = await pdfParser.extractText(filePath);
@@ -155,17 +180,45 @@ const worker = new Worker<ReportJobData>(
       });
       console.log(`   └─ Generated ${generatedScript.length} characters (~${Math.ceil(generatedScript.split(' ').length / 150)} min)`);
 
-      // Step 3: Save extracted text and generated script BEFORE TTS
+      // Step 2.5: Generate title
+      console.log('\n📝 Generating title...');
+      let title: string;
+      
+      try {
+        // Use AI to generate a short, descriptive title
+        const titlePrompt = `Create a short, descriptive title (max 60 characters) for this document. 
+Return ONLY the title, no quotes, no explanation.
+
+Content preview:
+${finalExtractedText.substring(0, 500)}...`;
+
+        const titleResponse = await aiProviderInstance.generateScript(titlePrompt, {
+          tone: 'professional',
+          systemPrompt: 'You are a title generator. Create concise, descriptive titles.',
+          userPromptTemplate: '{text}',
+        });
+        
+        title = titleResponse.trim().replace(/^["']|["']$/g, '').substring(0, 60);
+        console.log(`   └─ Title: "${title}"`);
+      } catch (error) {
+        console.warn('   ⚠️  Title generation failed, using fallback');
+        // Fallback: use first line
+        const firstLine = finalExtractedText.split('\n')[0].trim();
+        title = firstLine.substring(0, 60) || 'Untitled Report';
+      }
+
+      // Step 3: Save extracted text, script, and title BEFORE TTS
       // This ensures we have the data even if TTS fails
-      console.log('\n💾 Saving extracted text and generated script to database...');
+      console.log('\n💾 Saving content to database...');
       await db
         .update(reports)
         .set({
           extractedText: finalExtractedText,
           generatedScript: generatedScript,
+          title: title,
         })
         .where(eq(reports.id, reportId));
-      console.log('   ✅ Scripts saved to database');
+      console.log('   ✅ Content saved to database');
 
       // Step 4: Generate audio with TTS
       console.log(`\n🎙️  Converting to audio with ${ttsProvider}...`);

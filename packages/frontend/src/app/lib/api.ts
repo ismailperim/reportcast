@@ -172,6 +172,8 @@ class ApiClient {
     return this.request<{
       id: string;
       filename: string;
+      originalFilename?: string;
+      title?: string;
       pageCount: number;
       tier: string;
       status: string;
@@ -179,8 +181,14 @@ class ApiClient {
       audioSize?: number;
       audioDurationSeconds?: number;
       processingTimeMs?: number;
+      aiProvider?: string;
+      ttsProvider?: string;
+      voice?: string;
+      tone?: string;
       aiCostCents?: number;
       ttsCostCents?: number;
+      listenCount?: number;
+      lastListenedAt?: string;
       errorMessage?: string | null;
       createdAt: string;
       completedAt?: string;
@@ -190,6 +198,12 @@ class ApiClient {
   async deleteReport(reportId: string) {
     return this.request<{ message: string }>(`/api/reports/${reportId}`, {
       method: 'DELETE',
+    });
+  }
+
+  async trackListen(reportId: string) {
+    return this.request<{ message: string; listenCount: number }>(`/api/reports/${reportId}/listen`, {
+      method: 'POST',
     });
   }
 
@@ -231,7 +245,21 @@ class ApiClient {
   }
 
   getListenUrl(shareToken: string): string {
-    return `${API_BASE_URL}/listen/${shareToken}`;
+    return `${API_BASE_URL}/api/stream/${shareToken}`;
+  }
+
+  async getPublicMetadata(shareToken: string) {
+    return this.request<{
+      id: string;
+      title: string;
+      filename: string;
+      pageCount: number;
+      audioDurationSeconds?: number;
+      audioSize?: number;
+      listenCount?: number;
+      createdAt: string;
+      completedAt?: string;
+    }>(`/api/share/metadata/${shareToken}`);
   }
 
   // Pricing

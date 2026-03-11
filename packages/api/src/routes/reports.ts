@@ -30,10 +30,23 @@ router.get('/', authenticateUser, async (req, res) => {
       reports: userReports.map(r => ({
         id: r.id,
         filename: r.filename,
+        originalFilename: r.originalFilename,
+        title: r.title,
         pageCount: r.pageCount,
         tier: r.tier,
         status: r.status,
         audioUrl: r.audioUrl,
+        audioSize: r.audioSize,
+        audioDurationSeconds: r.audioDurationSeconds,
+        processingTimeMs: r.processingTimeMs,
+        aiProvider: r.aiProvider,
+        ttsProvider: r.ttsProvider,
+        voice: r.voice,
+        tone: r.tone,
+        aiCostCents: r.aiCostCents,
+        ttsCostCents: r.ttsCostCents,
+        listenCount: r.listenCount,
+        errorMessage: r.errorMessage,
         createdAt: r.createdAt,
         completedAt: r.completedAt,
       })),
@@ -75,6 +88,8 @@ router.get('/:reportId', authenticateUser, async (req, res) => {
     res.json({
       id: report.id,
       filename: report.filename,
+      originalFilename: report.originalFilename,
+      title: report.title,
       pageCount: report.pageCount,
       tier: report.tier,
       status: report.status,
@@ -82,8 +97,14 @@ router.get('/:reportId', authenticateUser, async (req, res) => {
       audioSize: report.audioSize,
       audioDurationSeconds: report.audioDurationSeconds,
       processingTimeMs: report.processingTimeMs,
+      aiProvider: report.aiProvider,
+      ttsProvider: report.ttsProvider,
+      voice: report.voice,
+      tone: report.tone,
       aiCostCents: report.aiCostCents,
       ttsCostCents: report.ttsCostCents,
+      listenCount: report.listenCount,
+      lastListenedAt: report.lastListenedAt,
       errorMessage: report.errorMessage,
       createdAt: report.createdAt,
       completedAt: report.completedAt,
@@ -153,6 +174,51 @@ router.get('/:reportId/download', authenticateUser, async (req, res) => {
   } catch (error) {
     console.error('Download error:', error);
     res.status(500).json({ error: 'Download failed' });
+  }
+});
+
+/**
+ * POST /api/reports/:reportId/listen
+ * 
+ * Track listen event (increment listen count)
+ */
+router.post('/:reportId/listen', authenticateUser, async (req, res) => {
+  try {
+    const { reportId } = req.params;
+    const userId = req.user!.id;
+
+    const [report] = await db
+      .select()
+      .from(reports)
+      .where(and(
+        eq(reports.id, reportId),
+        eq(reports.userId, userId)
+      ))
+      .limit(1);
+
+    if (!report) {
+      return res.status(404).json({ error: 'Report not found' });
+    }
+
+    // Update listen count
+    await db
+      .update(reports)
+      .set({
+        listenCount: (report.listenCount || 0) + 1,
+        lastListenedAt: new Date(),
+      })
+      .where(eq(reports.id, reportId));
+
+    console.log(`✅ Listen count updated for report ${reportId} (owner: ${userId})`);
+
+    res.json({ 
+      message: 'Listen tracked',
+      listenCount: (report.listenCount || 0) + 1,
+    });
+
+  } catch (error) {
+    console.error('Track listen error:', error);
+    res.status(500).json({ error: 'Failed to track listen' });
   }
 });
 

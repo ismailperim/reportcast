@@ -89,7 +89,8 @@ router.post('/', authenticateUser, upload.single('file'), async (req, res) => {
     // Create report record
     const [report] = await db.insert(reports).values({
       userId,
-      filename: savedFilename, // Gerçek dosya adı (multer'ın oluşturduğu)
+      filename: savedFilename, // Server-generated hash filename
+      originalFilename: originalFilename, // User's uploaded filename
       fileSize,
       pageCount,
       tier,

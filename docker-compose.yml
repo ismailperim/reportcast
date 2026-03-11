@@ -11,7 +11,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: reportcast
-      POSTGRES_PASSWORD: reportcast_dev_password
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-your_secure_password_here}
       POSTGRES_DB: reportcast
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -97,7 +97,7 @@ services:
       DB_HOST: postgres
       DB_PORT: 5432
       DB_USER: reportcast
-      DB_PASSWORD: reportcast_dev_password
+      DB_PASSWORD: ${DB_PASSWORD:-your_secure_password_here}
       DB_NAME: reportcast
       REDIS_HOST: redis
       REDIS_PORT: 6379
@@ -109,6 +109,7 @@ services:
       ELEVENLABS_API_KEY: ${ELEVENLABS_API_KEY}
       ENABLE_OPENAI_TTS: ${ENABLE_OPENAI_TTS:-false}
       ENABLE_ELEVENLABS_TTS: ${ENABLE_ELEVENLABS_TTS:-false}
+      PUBLIC_URL: ${PUBLIC_URL:-http://localhost:5173}
       # S3 disabled (using local disk)
       # S3_PROVIDER: ${S3_PROVIDER}
       # S3_ENDPOINT: ${S3_ENDPOINT}
@@ -152,7 +153,7 @@ services:
       DB_HOST: postgres
       DB_PORT: 5432
       DB_USER: reportcast
-      DB_PASSWORD: reportcast_dev_password
+      DB_PASSWORD: ${DB_PASSWORD:-your_secure_password_here}
       DB_NAME: reportcast
       REDIS_HOST: redis
       REDIS_PORT: 6379

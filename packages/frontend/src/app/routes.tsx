@@ -33,7 +33,7 @@ export const router = createBrowserRouter([
     ),
   },
   {
-    path: "/p/:shareId",
+    path: "/listen/:shareToken",
     Component: PodcastPage,
   },
 ]);

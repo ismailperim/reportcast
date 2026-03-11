@@ -3,7 +3,7 @@ import { db } from '../db/index.js';
 import { reports, listens } from '../db/schema.js';
 import { authenticateUser } from '../middleware/auth.js';
 import { eq, and, desc } from 'drizzle-orm';
-import crypto from 'crypto';
+import { ulid } from 'ulid';
 import { getStorage } from '../storage/s3-storage.js';
 
 const router = Router();
@@ -38,7 +38,7 @@ router.post('/:reportId', authenticateUser, async (req, res) => {
     // Generate share token if not exists
     let shareToken = report.shareToken;
     if (!shareToken) {
-      shareToken = crypto.randomBytes(16).toString('hex');
+      shareToken = ulid();
     }
 
     // Update report
@@ -156,11 +156,58 @@ router.get('/:reportId/stats', authenticateUser, async (req, res) => {
 });
 
 /**
- * GET /listen/:shareToken
+ * GET /api/share/metadata/:shareToken
+ * 
+ * Public endpoint: Get report metadata by share token (no auth required)
+ */
+router.get('/metadata/:shareToken', async (req, res) => {
+  try {
+    const { shareToken } = req.params;
+
+    // Get report by share token
+    const [report] = await db
+      .select()
+      .from(reports)
+      .where(and(
+        eq(reports.shareToken, shareToken),
+        eq(reports.isPublic, true)
+      ))
+      .limit(1);
+
+    if (!report) {
+      return res.status(404).json({ error: 'Podcast not found or not public' });
+    }
+
+    if (report.status !== 'completed') {
+      return res.status(400).json({ error: 'Podcast not ready' });
+    }
+
+    // Return public metadata (no sensitive user data)
+    res.json({
+      id: report.id,
+      title: report.title || report.originalFilename || report.filename,
+      filename: report.filename,
+      pageCount: report.pageCount,
+      audioDurationSeconds: report.audioDurationSeconds,
+      audioSize: report.audioSize,
+      listenCount: report.listenCount,
+      createdAt: report.createdAt,
+      completedAt: report.completedAt,
+    });
+
+  } catch (error) {
+    console.error('Metadata error:', error);
+    res.status(500).json({ error: 'Failed to get metadata' });
+  }
+});
+
+/**
+ * GET /:shareToken
  * 
  * Public endpoint: Stream/download audio by share token (no auth required)
+ * Mounted at /listen, so full path is /listen/:shareToken
  */
-router.get('/listen/:shareToken', async (req, res) => {
+router.get('/:shareToken', async (req, res) => {
   try {
     const { shareToken } = req.params;
     const userAgent = req.headers['user-agent'] || '';
@@ -183,10 +230,6 @@ router.get('/listen/:shareToken', async (req, res) => {
 
     if (report.status !== 'completed') {
       return res.status(400).json({ error: 'Podcast not ready' });
-    }
-
-    if (!report.s3Key) {
-      return res.status(404).json({ error: 'Audio file not found' });
     }
 
     // Track listen event (async, don't block response)

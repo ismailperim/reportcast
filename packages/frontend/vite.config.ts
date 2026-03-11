@@ -34,10 +34,8 @@ export default defineConfig({
         target: 'http://localhost:3000',
         changeOrigin: true,
       },
-      '/listen': {
-        target: 'http://localhost:3000',
-        changeOrigin: true,
-      },
+      // Note: /listen is now a frontend route (public player page)
+      // Audio streaming uses /api endpoint via getListenUrl()
     },
   },
 })

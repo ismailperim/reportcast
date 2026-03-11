@@ -28,7 +28,8 @@
     "@aws-sdk/lib-storage": "^3.713.0",
     "@aws-sdk/s3-request-presigner": "^3.713.0",
     "stripe": "^17.5.0",
-    "pdf-parse": "^1.1.1"
+    "pdf-parse": "^1.1.1",
+    "ulid": "^2.3.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

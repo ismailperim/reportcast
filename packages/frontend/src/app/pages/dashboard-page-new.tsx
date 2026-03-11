@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../co
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "../components/ui/dialog";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
-import { Radio, Upload, FileText, Share2, Play, Clock, MoreVertical, ArrowLeft, LogOut, DollarSign, CreditCard } from "lucide-react";
+import { Radio, Upload, FileText, Share2, Play, Clock, MoreVertical, ArrowLeft, LogOut, DollarSign, CreditCard, Trash2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../components/ui/dropdown-menu";
 import { Badge } from "../components/ui/badge";
 import { toast } from "sonner";
@@ -13,17 +13,32 @@ import { LanguageSwitcher } from "../components/language-switcher";
 import { useLanguage } from "../contexts/language-context";
 import { useAuth } from "../contexts/auth-context";
 import { api } from "../lib/api";
+import { AudioPlayer } from "../components/audio-player";
+import { ShareDialog } from "../components/share-dialog";
 
 interface Report {
   id: string;
   filename: string;
+  originalFilename?: string;
+  title?: string;
   pageCount: number;
   tier: string;
   status: 'pending' | 'processing' | 'completed' | 'failed';
   audioUrl?: string;
+  audioSize?: number;
+  audioDurationSeconds?: number;
   errorMessage?: string;
   createdAt: string;
   completedAt?: string;
+  processingTimeMs?: number;
+  aiCostCents?: number;
+  ttsCostCents?: number;
+  aiProvider?: string;
+  ttsProvider?: string;
+  voice?: string;
+  tone?: string;
+  listenCount?: number;
+  lastListenedAt?: string;
 }
 
 interface UploadResponse {
@@ -81,6 +96,22 @@ export function DashboardPage() {
   const [selectedTTSVoice, setSelectedTTSVoice] = useState<string>('');
   const [selectedLanguage, setSelectedLanguage] = useState<string>('auto');
   const [selectedTone, setSelectedTone] = useState<string>('professional');
+  
+  // Audio player
+  const [playerOpen, setPlayerOpen] = useState(false);
+  const [currentAudio, setCurrentAudio] = useState<{ url: string; title: string; reportId: string } | null>(null);
+  
+  // Detail modal
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [selectedReport, setSelectedReport] = useState<Report | null>(null);
+
+  // Share modal
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [shareData, setShareData] = useState<{
+    shareUrl: string;
+    shareToken: string;
+    reportTitle: string;
+  } | null>(null);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -96,6 +127,32 @@ export function DashboardPage() {
       loadModelsAndVoices();
     }
   }, [user]);
+
+  // Refresh report details when modal opens
+  useEffect(() => {
+    if (detailOpen && selectedReport) {
+      refreshReportDetails(selectedReport.id);
+    }
+  }, [detailOpen]);
+
+  const refreshReportDetails = async (reportId: string) => {
+    try {
+      const freshReport = await api.getReport(reportId);
+      
+      // Update selected report with fresh data (merge all fields)
+      setSelectedReport(prev => prev ? {
+        ...prev,
+        ...freshReport,
+      } : null);
+
+      // Also update in main list
+      setReports(prev =>
+        prev.map(r => r.id === reportId ? { ...r, listenCount: freshReport.listenCount } : r)
+      );
+    } catch (error) {
+      console.error('Failed to refresh report details:', error);
+    }
+  };
 
   const loadModelsAndVoices = async () => {
     try {
@@ -226,8 +283,18 @@ export function DashboardPage() {
   const handleShare = async (reportId: string) => {
     try {
       const response = await api.enableSharing(reportId);
-      navigator.clipboard.writeText(response.shareUrl);
-      toast.success(t('dashboard.copy.success'));
+      
+      // Find report to get title
+      const report = reports.find(r => r.id === reportId);
+      const title = report?.title || report?.originalFilename || report?.filename || 'Podcast';
+      
+      // Set share data and open modal
+      setShareData({
+        shareUrl: response.shareUrl,
+        shareToken: response.shareToken,
+        reportTitle: title,
+      });
+      setShareDialogOpen(true);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to enable sharing');
     }
@@ -525,6 +592,239 @@ export function DashboardPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Audio Player Dialog */}
+      <Dialog open={playerOpen} onOpenChange={setPlayerOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>
+              {language === 'en' ? 'Listen' : 'Dinle'}
+            </DialogTitle>
+            {currentAudio && (
+              <DialogDescription className="truncate">
+                {currentAudio.title}
+              </DialogDescription>
+            )}
+          </DialogHeader>
+          {currentAudio && (
+            <AudioPlayer
+              src={currentAudio.url}
+              title={currentAudio.title}
+              onDownload={() => {
+                window.open(currentAudio.url, '_blank');
+              }}
+              onPlay={async () => {
+                try {
+                  const result = await api.trackListen(currentAudio.reportId);
+                  console.log('✅ Listen tracked');
+                  
+                  // Update listen count in reports list
+                  setReports(prev =>
+                    prev.map(r => 
+                      r.id === currentAudio.reportId 
+                        ? { ...r, listenCount: result.listenCount }
+                        : r
+                    )
+                  );
+
+                  // Update selected report if detail modal is open
+                  if (selectedReport && selectedReport.id === currentAudio.reportId) {
+                    setSelectedReport(prev => prev ? { ...prev, listenCount: result.listenCount } : null);
+                  }
+                } catch (error) {
+                  console.error('Failed to track listen:', error);
+                }
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Report Detail Dialog */}
+      <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
+        <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{language === 'en' ? 'Report Details' : 'Rapor Detayları'}</DialogTitle>
+            {selectedReport && (
+              <DialogDescription className="truncate">
+                {selectedReport.title || selectedReport.originalFilename || selectedReport.filename}
+              </DialogDescription>
+            )}
+          </DialogHeader>
+          
+          {selectedReport && (
+            <div className="space-y-6">
+              {/* Status & Basic Info */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-slate-600">{language === 'en' ? 'Status' : 'Durum'}</span>
+                  {getStatusBadge(selectedReport.status)}
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-slate-600">{language === 'en' ? 'Pages' : 'Sayfa'}</span>
+                  <span className="font-medium">{selectedReport.pageCount}</span>
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-slate-600">{language === 'en' ? 'Created' : 'Oluşturulma'}</span>
+                  <span className="font-medium">{formatDate(selectedReport.createdAt)}</span>
+                </div>
+                
+                {selectedReport.completedAt && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-slate-600">{language === 'en' ? 'Completed' : 'Tamamlanma'}</span>
+                    <span className="font-medium">{formatDate(selectedReport.completedAt)}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Audio Info */}
+              {selectedReport.status === 'completed' && (
+                <>
+                  <div className="border-t pt-4 space-y-3">
+                    <h4 className="font-semibold text-sm">{language === 'en' ? 'Audio Information' : 'Ses Bilgileri'}</h4>
+                    
+                    {selectedReport.audioDurationSeconds && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-slate-600">{language === 'en' ? 'Duration' : 'Süre'}</span>
+                        <span className="font-medium">
+                          {Math.floor(selectedReport.audioDurationSeconds / 60)}:{String(selectedReport.audioDurationSeconds % 60).padStart(2, '0')}
+                        </span>
+                      </div>
+                    )}
+                    
+                    {selectedReport.audioSize && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-slate-600">{language === 'en' ? 'File Size' : 'Dosya Boyutu'}</span>
+                        <span className="font-medium">
+                          {(selectedReport.audioSize / 1024 / 1024).toFixed(2)} MB
+                        </span>
+                      </div>
+                    )}
+                    
+                    {selectedReport.listenCount !== undefined && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-slate-600">{language === 'en' ? 'Listen Count' : 'Dinlenme Sayısı'}</span>
+                        <span className="font-medium">{selectedReport.listenCount}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Processing Info */}
+                  <div className="border-t pt-4 space-y-3">
+                    <h4 className="font-semibold text-sm">{language === 'en' ? 'Processing Details' : 'İşleme Detayları'}</h4>
+                    
+                    {selectedReport.processingTimeMs && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-slate-600">{language === 'en' ? 'Processing Time' : 'İşlem Süresi'}</span>
+                        <span className="font-medium">{(selectedReport.processingTimeMs / 1000).toFixed(1)}s</span>
+                      </div>
+                    )}
+                    
+                    {selectedReport.aiProvider && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-slate-600">{language === 'en' ? 'AI Model' : 'AI Modeli'}</span>
+                        <span className="font-medium capitalize">{selectedReport.aiProvider}</span>
+                      </div>
+                    )}
+                    
+                    {selectedReport.ttsProvider && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-slate-600">{language === 'en' ? 'TTS Provider' : 'TTS Sağlayıcı'}</span>
+                        <span className="font-medium capitalize">{selectedReport.ttsProvider}</span>
+                      </div>
+                    )}
+                    
+                    {selectedReport.voice && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-slate-600">{language === 'en' ? 'Voice' : 'Ses'}</span>
+                        <span className="font-medium text-xs">{selectedReport.voice}</span>
+                      </div>
+                    )}
+                    
+                    {selectedReport.tone && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-slate-600">{language === 'en' ? 'Tone' : 'Ton'}</span>
+                        <span className="font-medium capitalize">{selectedReport.tone}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Credits Used */}
+                  <div className="border-t pt-4 space-y-3">
+                    <h4 className="font-semibold text-sm">{language === 'en' ? 'Credits Used' : 'Kullanılan Kredi'}</h4>
+                    
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-slate-600">{language === 'en' ? 'Pages' : 'Sayfa'}</span>
+                      <span className="font-medium">{selectedReport.pageCount}</span>
+                    </div>
+                    
+                    <div className="flex items-center justify-between border-t pt-2 font-semibold">
+                      <span className="text-sm">{language === 'en' ? 'Total Credits' : 'Toplam Kredi'}</span>
+                      <span className="text-indigo-600">{Math.ceil(selectedReport.pageCount / 3)}</span>
+                    </div>
+                    
+                    <p className="text-xs text-slate-500 mt-2">
+                      {language === 'en' ? '1 credit = 3 pages' : '1 kredi = 3 sayfa'}
+                    </p>
+                  </div>
+                </>
+              )}
+
+              {/* Error Message */}
+              {selectedReport.status === 'failed' && selectedReport.errorMessage && (
+                <div className="border-t pt-4">
+                  <h4 className="font-semibold text-sm text-red-600 mb-2">{language === 'en' ? 'Error' : 'Hata'}</h4>
+                  <p className="text-sm text-slate-600 bg-red-50 p-3 rounded">
+                    {selectedReport.errorMessage}
+                  </p>
+                </div>
+              )}
+
+              {/* Actions */}
+              {selectedReport.status === 'completed' && (
+                <div className="flex gap-2 pt-4 border-t">
+                  <Button
+                    className="flex-1 gap-2"
+                    onClick={() => {
+                      setCurrentAudio({
+                        url: api.getDownloadUrl(selectedReport.id),
+                        title: selectedReport.title || selectedReport.originalFilename?.replace('.pdf', '') || selectedReport.filename.replace('.pdf', ''),
+                        reportId: selectedReport.id
+                      });
+                      setPlayerOpen(true);
+                      setDetailOpen(false);
+                    }}
+                  >
+                    <Play className="size-4" />
+                    {language === 'en' ? 'Listen' : 'Dinle'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="flex-1 gap-2"
+                    onClick={() => handleShare(selectedReport.id)}
+                  >
+                    <Share2 className="size-4" />
+                    {language === 'en' ? 'Share' : 'Paylaş'}
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Share Dialog */}
+      {shareData && (
+        <ShareDialog
+          open={shareDialogOpen}
+          onOpenChange={setShareDialogOpen}
+          shareUrl={shareData.shareUrl}
+          shareToken={shareData.shareToken}
+          reportTitle={shareData.reportTitle}
+        />
+      )}
+
       {/* Content */}
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
@@ -595,7 +895,7 @@ export function DashboardPage() {
                         <Radio className="size-6 text-white" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold truncate">{report.filename}</h3>
+                        <h3 className="font-semibold truncate">{report.title || report.originalFilename || report.filename}</h3>
                         <div className="flex items-center gap-3 text-sm text-slate-500 mt-1">
                           <span className="flex items-center gap-1">
                             <Clock className="size-3" />
@@ -639,7 +939,14 @@ export function DashboardPage() {
                             size="sm"
                             variant="outline"
                             className="gap-2"
-                            onClick={() => window.open(api.getDownloadUrl(report.id), '_blank')}
+                            onClick={() => {
+                              setCurrentAudio({
+                                url: api.getDownloadUrl(report.id),
+                                title: report.title || report.originalFilename?.replace('.pdf', '') || report.filename.replace('.pdf', ''),
+                                reportId: report.id
+                              });
+                              setPlayerOpen(true);
+                            }}
                           >
                             <Play className="size-4" />
                             {t('dashboard.reports.listen')}
@@ -662,26 +969,63 @@ export function DashboardPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setSelectedReport(report);
+                              setDetailOpen(true);
+                            }}
+                          >
+                            <FileText className="size-4 mr-2" />
+                            {language === 'en' ? 'Details' : 'Detaylar'}
+                          </DropdownMenuItem>
+                          
+                          {report.status === 'completed' && (
+                            <>
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setCurrentAudio({
+                                    url: api.getDownloadUrl(report.id),
+                                    title: report.title || report.originalFilename?.replace('.pdf', '') || report.filename.replace('.pdf', ''),
+                                    reportId: report.id
+                                  });
+                                  setPlayerOpen(true);
+                                }}
+                              >
+                                <Play className="size-4 mr-2" />
+                                {language === 'en' ? 'Listen' : 'Dinle'}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleShare(report.id)}>
+                                <Share2 className="size-4 mr-2" />
+                                {language === 'en' ? 'Share' : 'Paylaş'}
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                          
                           {report.status === 'pending' && (
                             <DropdownMenuItem
                               onClick={() => handleContinueProcessing(report.id)}
                             >
+                              <Upload className="size-4 mr-2" />
                               {language === 'en' ? 'Continue Processing' : 'İşleme Devam Et'}
                             </DropdownMenuItem>
                           )}
+                          
                           {report.status === 'failed' && report.errorMessage && (
                             <DropdownMenuItem
                               onClick={() => {
                                 toast.error(report.errorMessage || 'Unknown error');
                               }}
                             >
+                              <FileText className="size-4 mr-2" />
                               {language === 'en' ? 'Show Error' : 'Hatayı Göster'}
                             </DropdownMenuItem>
                           )}
+                          
                           <DropdownMenuItem
                             className="text-red-600"
                             onClick={() => handleDelete(report.id)}
                           >
+                            <Trash2 className="size-4 mr-2" />
                             {language === 'en' ? 'Delete' : 'Sil'}
                           </DropdownMenuItem>
                         </DropdownMenuContent>

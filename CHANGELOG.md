@@ -8,10 +8,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Planned
-- Web audio player (no direct download)
-- Public/Private share links
+- Language-voice matching validation
 - Listen analytics dashboard
+- Public player UI redesign (white/minimal theme)
 - Frontend UI polish
+
+---
+
+## [0.5.0] - 2026-03-11
+
+### Added
+- **ULID Share Tokens** 🔗
+  - Replaced crypto.randomBytes with ULID (26 char vs 32 char)
+  - URL-safe, timestamp-based, sortable tokens
+  - Only alphanumeric (0-9, A-Z)
+- **Share Dialog Modal** 📋
+  - Token and link display
+  - Copy buttons with visual feedback
+  - "Open Link" and "Download" actions
+  - HTTP-compatible clipboard fallback
+- **Public Player Page** 🎵
+  - Dedicated `/listen/:token` route
+  - Audio streaming via `/api/stream/:token`
+  - Metadata API (`/api/share/metadata/:token`)
+  - Keyboard shortcuts (Space, ←, →, M)
+  - Modern UI (gradient background, glassmorphism)
+- **Listen Count Real-Time Updates** 📊
+  - POST `/api/reports/:id/listen` endpoint
+  - Automatic count increment on play
+  - Detail modal auto-refresh
+  - State updates without page reload
+- **AI-Generated Titles** ✨
+  - Database migration: `title` and `originalFilename` fields
+  - Worker generates titles (max 60 chars from first 500 chars)
+  - Title fallback chain: title → originalFilename → filename
+- **Web Audio Player Component** 🎧
+  - Dialog-based player
+  - Play/pause, volume, progress controls
+  - Duration and current time display
+
+### Changed
+- **Audio Streaming Endpoint** moved from `/listen/:token` to `/api/stream/:token`
+- **Frontend route** `/listen/:token` now serves public player (React SPA)
+- **Vite proxy** removed `/listen` rule (frontend route priority)
+- **Share URL generation** uses ULID tokens
+- **Report title display** prioritizes AI-generated titles
+- **Detail modal** now fetches fresh data on open
+
+### Fixed
+- Listen count not updating (added dedicated tracking endpoint)
+- S3 check blocking local disk audio serving
+- Route conflict between frontend and backend `/listen`
+- Detail modal showing stale data
+
+### Security
+- Database passwords use env vars (no hardcoded values)
+- PUBLIC_URL defaults to localhost (not LAN IP)
+- All sensitive data in .gitignore
+
+### Technical
+- `ulid` package added (v2.3.0)
+- Share token generation: `ulid()` instead of `crypto.randomBytes(16)`
+- Frontend: ShareDialog component
+- Backend: Share metadata endpoint
+- Migration: 0004_add_title_fields.sql
 
 ---
 
