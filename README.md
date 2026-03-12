@@ -1,6 +1,6 @@
 # ReportCast
 
-[![Docker Build](https://github.com/ismailperim/reportcast/actions/workflows/docker-release.yml/badge.svg?branch=main)](https://github.com/ismailperim/reportcast/actions/workflows/docker-release.yml)
+[![Docker Build](https://github.com/ismailperim/reportcast/actions/workflows/docker-release.yml/badge.svg)](https://github.com/ismailperim/reportcast/actions/workflows/docker-release.yml)
 [![GitHub Stars](https://img.shields.io/github/stars/ismailperim/reportcast?style=flat&logo=github)](https://github.com/ismailperim/reportcast/stargazers)
 [![GitHub Issues](https://img.shields.io/github/issues/ismailperim/reportcast?style=flat&logo=github)](https://github.com/ismailperim/reportcast/issues)
 [![License](https://img.shields.io/github/license/ismailperim/reportcast?style=flat)](https://github.com/ismailperim/reportcast/blob/main/LICENSE)
