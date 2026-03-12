@@ -1,52 +1,17 @@
 import { Link } from "react-router";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
-import { Upload, Radio, Share2, Headphones, Zap, Shield } from "lucide-react";
+import { Upload, Share2, Headphones, Zap, Shield } from "lucide-react";
 import { ImageWithFallback } from "../components/figma/ImageWithFallback";
-import { LanguageSwitcher } from "../components/language-switcher";
+import { NavBar } from "../components/navbar";
 import { useLanguage } from "../contexts/language-context";
-import { useAuth } from "../contexts/auth-context";
 
 export function LandingPage() {
   const { t } = useLanguage();
-  const { isAuthenticated, user } = useAuth();
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
-      {/* Navigation */}
-      <nav className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Radio className="size-6 text-indigo-600" />
-            <span className="font-semibold text-xl">ReportCast</span>
-          </div>
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="sm" asChild>
-              <Link to="/pricing">{t('nav.pricing')}</Link>
-            </Button>
-            <LanguageSwitcher />
-            {isAuthenticated ? (
-              <>
-                <Button variant="ghost" asChild>
-                  <Link to="/dashboard">Dashboard</Link>
-                </Button>
-                <div className="text-sm text-slate-600">
-                  {user?.name || user?.email}
-                </div>
-              </>
-            ) : (
-              <>
-                <Button variant="ghost" asChild>
-                  <Link to="/login">{t('nav.login')}</Link>
-                </Button>
-                <Button asChild>
-                  <Link to="/signup">{t('nav.getStarted')}</Link>
-                </Button>
-              </>
-            )}
-          </div>
-        </div>
-      </nav>
+      <NavBar transparent />
 
       {/* Hero Section */}
       <section className="container mx-auto px-4 py-20 text-center">

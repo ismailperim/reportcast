@@ -1,18 +1,18 @@
-# ReportCast - Production Docker Compose
+# ReportCast - Development Docker Compose
 #
-# This file uses pre-built images from GitHub Container Registry.
-# Perfect for end-users and production deployments.
+# This file builds images locally from source code.
+# Perfect for developers making code changes.
 #
-# For development with local builds, use: docker-compose.dev.yml
+# For production deployment, use: docker-compose.yml (pre-built images)
 #
 # Quick start:
 #   1. cp .env.example .env
 #   2. Edit .env and add your API keys
-#   3. docker compose up -d
+#   3. docker compose -f docker-compose.dev.yml up -d
 #   4. docker exec reportcast-api npm run db:migrate
 #
-# Images will be pulled from: ghcr.io/ismailperim/reportcast-*
-# Version: Set API_VERSION, WORKER_VERSION, TTS_VERSION env vars (default: latest)
+# Images will be built locally from Dockerfiles.
+# Code changes require rebuild: docker compose -f docker-compose.dev.yml build
 # Version: 0.4.0
 # TTS: Piper-GPL (free, self-hosted)
 # Storage: Local disk (MinIO optional)
@@ -78,7 +78,10 @@ services:
   # TTS Server (Piper-GPL - Free, Self-hosted)
   # 19 voices pre-loaded (TR, EN, DE, FR, ES, RU)
   tts-server:
-    image: ghcr.io/ismailperim/reportcast-piper-tts:${TTS_VERSION:-latest}
+    build:
+      context: .
+      dockerfile: Dockerfile.piper-http
+    image: reportcast-piper-tts:${TTS_VERSION:-latest}
     container_name: reportcast-tts
     restart: unless-stopped
     ports:
@@ -87,7 +90,11 @@ services:
 
   # API Server
   api:
-    image: ghcr.io/ismailperim/reportcast-api:${API_VERSION:-latest}
+    # image: ghcr.io/ismailperim/reportcast-api:${API_VERSION:-latest}
+    build:
+      context: .
+      dockerfile: packages/api/Dockerfile
+    image: reportcast-api:latest
     container_name: reportcast-api
     restart: unless-stopped
     working_dir: /app/packages/api
@@ -138,7 +145,11 @@ services:
 
   # BullMQ Worker
   worker:
-    image: ghcr.io/ismailperim/reportcast-worker:${WORKER_VERSION:-latest}
+    # image: ghcr.io/ismailperim/reportcast-worker:${WORKER_VERSION:-latest}
+    build:
+      context: .
+      dockerfile: packages/worker/Dockerfile
+    image: reportcast-worker:latest
     container_name: reportcast-worker
     restart: unless-stopped
     working_dir: /app/packages/worker

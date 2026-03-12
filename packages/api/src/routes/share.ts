@@ -193,6 +193,8 @@ router.get('/metadata/:shareToken', async (req, res) => {
       listenCount: report.listenCount,
       createdAt: report.createdAt,
       completedAt: report.completedAt,
+      extractedText: report.extractedText, // For transcript display
+      generatedScript: report.generatedScript, // Alternative if extractedText is too long
     });
 
   } catch (error) {

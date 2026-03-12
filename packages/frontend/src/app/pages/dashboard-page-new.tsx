@@ -1,15 +1,15 @@
 import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router";
+import { useNavigate } from "react-router";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "../components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../components/ui/dialog";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
-import { Radio, Upload, FileText, Share2, Play, Clock, MoreVertical, ArrowLeft, LogOut, DollarSign, CreditCard, Trash2 } from "lucide-react";
+import { Upload, FileText, Share2, Play, Clock, MoreVertical, Trash2, Radio } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../components/ui/dropdown-menu";
 import { Badge } from "../components/ui/badge";
 import { toast } from "sonner";
-import { LanguageSwitcher } from "../components/language-switcher";
+import { NavBar } from "../components/navbar";
 import { useLanguage } from "../contexts/language-context";
 import { useAuth } from "../contexts/auth-context";
 import { api } from "../lib/api";
@@ -96,6 +96,21 @@ export function DashboardPage() {
   const [selectedTTSVoice, setSelectedTTSVoice] = useState<string>('');
   const [selectedLanguage, setSelectedLanguage] = useState<string>('auto');
   const [selectedTone, setSelectedTone] = useState<string>('professional');
+
+  // Filter voices based on selected language
+  const filteredVoices = selectedLanguage === 'auto' 
+    ? ttsVoices 
+    : ttsVoices.filter(v => v.language.toLowerCase().startsWith(selectedLanguage.toLowerCase()));
+
+  // Auto-select first voice when language changes
+  useEffect(() => {
+    if (filteredVoices.length > 0) {
+      const currentVoiceValid = filteredVoices.some(v => v.voiceId === selectedTTSVoice);
+      if (!currentVoiceValid) {
+        setSelectedTTSVoice(filteredVoices[0].voiceId);
+      }
+    }
+  }, [selectedLanguage, filteredVoices, selectedTTSVoice]);
   
   // Audio player
   const [playerOpen, setPlayerOpen] = useState(false);
@@ -381,86 +396,70 @@ export function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* Navigation */}
-      <nav className="border-b bg-white">
-        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-6">
-            <Link to="/" className="flex items-center gap-2">
-              <Radio className="size-6 text-indigo-600" />
-              <span className="font-semibold text-xl">ReportCast</span>
-            </Link>
-            <Button variant="ghost" size="sm" className="gap-2" asChild>
-              <Link to="/">
-                <ArrowLeft className="size-4" />
-                {language === 'en' ? 'Home' : 'Ana Sayfa'}
-              </Link>
-            </Button>
-            <Button variant="ghost" size="sm" className="gap-2" asChild>
-              <Link to="/pricing">
-                <CreditCard className="size-4" />
-                {t('nav.pricing')}
-              </Link>
-            </Button>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="text-sm text-slate-600 mr-2">
-              {user.name} • {user.creditsRemaining} {language === 'en' ? 'credits' : 'kredi'}
+      <NavBar />
+
+      {/* Page Header */}
+      <div className="border-b bg-slate-50/50">
+        <div className="container mx-auto px-4 py-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">
+                {language === 'en' ? 'My Reports' : 'Raporlarım'}
+              </h1>
+              <p className="text-sm text-slate-600 mt-1">
+                {language === 'en' ? 'Manage your podcast reports' : 'Podcast raporlarınızı yönetin'}
+              </p>
             </div>
-            <LanguageSwitcher />
-            <Button variant="ghost" size="sm" onClick={logout} className="gap-2">
-              <LogOut className="size-4" />
-              {language === 'en' ? 'Logout' : 'Çıkış'}
+            <Button onClick={() => setOpen(true)} className="gap-2 bg-indigo-600 hover:bg-indigo-700">
+              <Upload className="size-4" />
+              {t('dashboard.upload.title')}
             </Button>
-            <Dialog open={open} onOpenChange={setOpen}>
-              <DialogTrigger asChild>
-                <Button className="gap-2">
-                  <Upload className="size-4" />
-                  {t('dashboard.upload.title')}
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[500px]">
-                <DialogHeader>
-                  <DialogTitle>{t('dashboard.upload.title')}</DialogTitle>
-                  <DialogDescription>
-                    {t('dashboard.upload.desc')}
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="file">{language === 'en' ? 'PDF File' : 'PDF Dosyası'}</Label>
-                    <div className="border-2 border-dashed rounded-lg p-6 text-center hover:border-indigo-400 transition-colors cursor-pointer">
-                      <Input
-                        id="file"
-                        type="file"
-                        accept=".pdf"
-                        onChange={handleFileChange}
-                        className="hidden"
-                      />
-                      <label htmlFor="file" className="cursor-pointer">
-                        <Upload className="size-8 mx-auto mb-2 text-slate-400" />
-                        <p className="text-sm">
-                          {file ? file.name : (language === 'en' ? 'Select PDF file (max 50 pages)' : 'PDF dosyası seçin (maks 50 sayfa)')}
-                        </p>
-                        <p className="text-xs text-slate-500 mt-1">
-                          {language === 'en' ? 'Max 10MB' : 'Maksimum 10MB'}
-                        </p>
-                      </label>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex gap-2 justify-end">
-                  <Button variant="outline" onClick={() => setOpen(false)}>
-                    {language === 'en' ? 'Cancel' : 'İptal'}
-                  </Button>
-                  <Button onClick={handleUpload} disabled={!file || isUploading}>
-                    {isUploading ? t('common.loading') : (language === 'en' ? 'Upload' : 'Yükle')}
-                  </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
           </div>
         </div>
-      </nav>
+      </div>
+
+      {/* Upload Dialog */}
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>{t('dashboard.upload.title')}</DialogTitle>
+            <DialogDescription>
+              {t('dashboard.upload.desc')}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="file">{language === 'en' ? 'PDF File' : 'PDF Dosyası'}</Label>
+              <div className="border-2 border-dashed rounded-lg p-6 text-center hover:border-indigo-400 transition-colors cursor-pointer">
+                <Input
+                  id="file"
+                  type="file"
+                  accept=".pdf"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+                <label htmlFor="file" className="cursor-pointer">
+                  <Upload className="size-8 mx-auto mb-2 text-slate-400" />
+                  <p className="text-sm">
+                    {file ? file.name : (language === 'en' ? 'Select PDF file (max 50 pages)' : 'PDF dosyası seçin (maks 50 sayfa)')}
+                  </p>
+                  <p className="text-xs text-slate-500 mt-1">
+                    {language === 'en' ? 'Max 10MB' : 'Maksimum 10MB'}
+                  </p>
+                </label>
+              </div>
+            </div>
+          </div>
+          <div className="flex gap-2 justify-end">
+            <Button variant="outline" onClick={() => setOpen(false)}>
+              {language === 'en' ? 'Cancel' : 'İptal'}
+            </Button>
+            <Button onClick={handleUpload} disabled={!file || isUploading}>
+              {isUploading ? t('common.loading') : (language === 'en' ? 'Upload' : 'Yükle')}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Confirm Processing Dialog */}
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
@@ -509,30 +508,6 @@ export function DashboardPage() {
                   )}
                 </div>
 
-                {/* TTS Voice Selection */}
-                <div className="space-y-2">
-                  <Label htmlFor="tts-voice">
-                    {language === 'en' ? 'Voice' : 'Ses'}
-                  </Label>
-                  <select
-                    id="tts-voice"
-                    value={selectedTTSVoice}
-                    onChange={(e) => setSelectedTTSVoice(e.target.value)}
-                    className="w-full px-3 py-2 border rounded-md"
-                  >
-                    {ttsVoices.map((voice) => (
-                      <option key={voice.id} value={voice.voiceId}>
-                        {voice.displayName} ({voice.language}) {voice.isPremium && '👑'}
-                      </option>
-                    ))}
-                  </select>
-                  {ttsVoices.find(v => v.voiceId === selectedTTSVoice)?.description && (
-                    <p className="text-xs text-slate-500">
-                      {ttsVoices.find(v => v.voiceId === selectedTTSVoice)?.description}
-                    </p>
-                  )}
-                </div>
-
                 {/* Language Selection */}
                 <div className="space-y-2">
                   <Label htmlFor="language">
@@ -551,6 +526,41 @@ export function DashboardPage() {
                     <option value="fr">Français</option>
                     <option value="es">Español</option>
                   </select>
+                </div>
+
+                {/* TTS Voice Selection */}
+                <div className="space-y-2">
+                  <Label htmlFor="tts-voice">
+                    {language === 'en' ? 'Voice' : 'Ses'}
+                    {filteredVoices.length > 0 && selectedLanguage !== 'auto' && (
+                      <span className="text-xs text-slate-500 ml-2">
+                        ({filteredVoices.length} {language === 'en' ? 'available' : 'mevcut'})
+                      </span>
+                    )}
+                  </Label>
+                  <select
+                    id="tts-voice"
+                    value={selectedTTSVoice}
+                    onChange={(e) => setSelectedTTSVoice(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-md"
+                  >
+                    {filteredVoices.length > 0 ? (
+                      filteredVoices.map((voice) => (
+                        <option key={voice.id} value={voice.voiceId}>
+                          {voice.displayName} ({voice.language}) {voice.isPremium && '👑'}
+                        </option>
+                      ))
+                    ) : (
+                      <option value="">
+                        {language === 'en' ? 'No voices available for this language' : 'Bu dil için ses mevcut değil'}
+                      </option>
+                    )}
+                  </select>
+                  {ttsVoices.find(v => v.voiceId === selectedTTSVoice)?.description && (
+                    <p className="text-xs text-slate-500">
+                      {ttsVoices.find(v => v.voiceId === selectedTTSVoice)?.description}
+                    </p>
+                  )}
                 </div>
 
                 {/* Tone Selection */}
@@ -827,13 +837,6 @@ export function DashboardPage() {
 
       {/* Content */}
       <div className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">{t('dashboard.title')}</h1>
-          <p className="text-slate-600">
-            {language === 'en' ? 'Manage and share your podcasts' : 'Podcast\'lerinizi yönetin ve paylaşın'}
-          </p>
-        </div>
-
         {/* Stats */}
         <div className="grid md:grid-cols-3 gap-6 mb-8">
           <Card>

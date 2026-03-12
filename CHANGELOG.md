@@ -8,10 +8,79 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Planned
-- Language-voice matching validation
 - Listen analytics dashboard
-- Public player UI redesign (white/minimal theme)
-- Frontend UI polish
+- Backend language-voice validation
+- Advanced transcript features (search, timestamps)
+
+---
+
+## [0.6.0] - 2026-03-12
+
+### Added
+- **Live Transcript Sync** 📜✨
+  - AI-generated script displayed paragraph-by-paragraph
+  - Real-time highlight synced with audio playback
+  - Character-based timing algorithm (more accurate than equal distribution)
+  - Auto-scroll to active paragraph with smooth animation
+  - Click paragraph to jump to that timestamp
+  - Look-ahead tolerance (0.5s) for better sync accuracy
+  - Visual indicators: indigo highlight + left border on active paragraph
+  - "Live sync" badge when playing
+  - Scrollable transcript (max 500px height)
+- **Language-Voice Matching** 🎯
+  - Smart voice filtering: selecting a language shows only matching voices
+  - Auto-selection: when language changes, first matching voice is selected
+  - Voice count indicator: "(6 available)" label
+  - UI order improved: Language → Voice → Tone (logical flow)
+  - Fallback message when no voices available for selected language
+- **Modern Public Player UI** 🎨
+  - Enhanced album art: larger (size-40), gradient background (indigo/purple/slate)
+  - Mini play/pause badge on album art corner
+  - Bigger, bolder title with gradient text effect
+  - Improved meta badges with indigo accent colors
+  - Larger controls: play button (size-24), skip buttons (size-16)
+  - Gradient play button with hover scale effect
+  - Volume control with percentage display
+  - Better shadows and depth
+  - Wider layout (max-w-5xl)
+  - Card gradient background (white to slate-50)
+- **Navbar Standardization** 🧭
+  - Single `NavBar` component used across all pages (Landing, Dashboard, Pricing, Public Player)
+  - Consistent structure: Logo | Site Nav | Divider | User Actions | Divider | Language (always right)
+  - User dropdown menu with credits display and dashboard link
+  - Enterprise-style button variants (ghost, secondary, destructive)
+  - Page-specific props: `transparent`, `extraActions`, `showUpload` (deprecated)
+  - Upload button moved from navbar to dashboard page header
+- **Dashboard Page Header** 📊
+  - New header section: "My Reports" title + description
+  - Upload button relocated to header (right-aligned)
+  - Subtle gray background (slate-50/50) for visual separation
+  - Better visual hierarchy
+- **Public URL Configuration** 🔗
+  - Added `PUBLIC_URL` environment variable
+  - Share links now consistently use network IP (http://192.168.1.117:5173)
+  - Fixed issue where links alternated between localhost and IP
+
+### Changed
+- **Transcript Source Priority**: Now prefers `generatedScript` over `extractedText` (AI script is shorter and more readable)
+- **Transcript Timing Algorithm**: Switched from equal-paragraph-distribution to character-based timing for better sync
+- **Navbar Props**: Removed `showUpload` and `onUploadClick` (upload is now page-level action)
+- **Public Player**: Removed dashboard button from landing navbar (moved to user dropdown)
+- **Development Workflow**: Always use `docker-compose.dev.yml` for local development
+
+### Fixed
+- **Transcript Not Showing**: Added `extractedText` to public metadata API response
+- **Frontend State**: Fixed podcast state to include `extractedText` from API metadata
+- **Share Link Consistency**: PUBLIC_URL now stable across container restarts
+- **Navbar JSX**: Fixed missing closing tags and cleaned up structure
+- **Icon Imports**: Added missing icon imports (Radio, Clock, Link)
+
+### Technical
+- **API Routes**: `/api/share/metadata/:token` now returns `extractedText` and `generatedScript`
+- **Frontend Components**: `navbar.tsx` created (195 lines, reusable across all pages)
+- **Transcript Parsing**: `parseTranscriptWithTiming()` function with character-based distribution
+- **Auto-Scroll Logic**: Smart scroll behavior (only when playing, smooth animation)
+- **Debug Logging**: Console logs for paragraph count and timing info
 
 ---
 
